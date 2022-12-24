@@ -54,8 +54,6 @@ class EventProcessor:
             before = None
             cached_object = obj
 
-        self.cache[model].add(cached_object, id=id or cached_object.id)
-
         return before, cached_object
 
     def _delete_event(self, model: Type[T], *, id: Union[Tuple[Snowflake, Snowflake], Snowflake]) -> Optional[T]:
