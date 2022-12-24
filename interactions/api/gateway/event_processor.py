@@ -9,6 +9,7 @@ from ..models.misc import Snowflake, IDMixin
 from ..models.message import Message
 from ..models.user import User
 from ..models.member import Member
+from ..models.role import Role
 from ...utils.attrs_utils import DictSerializerMixin
 
 
@@ -57,8 +58,8 @@ class EventProcessor:
 
         return before, cached_object
 
-    def _delete_event(self, data: dict):
-        ...
+    def _delete_event(self, model: Type[T], *, id: Union[Tuple[Snowflake, Snowflake], Snowflake]) -> Optional[T]:
+        return self.cache[model].pop(id)
 
     # Discord events
 
@@ -90,7 +91,7 @@ class EventProcessor:
         return self._update_event(Channel, data)
 
     def channel_delete(self, data: dict) -> tuple:
-        channel = self.cache[Channel].pop(Snowflake(data["id"]), None)
+        channel = self._delete_event(Channel, id=Snowflake(data["id"]))
         if channel is None:
             channel = Channel(**data)
 
@@ -118,7 +119,7 @@ class EventProcessor:
         return self._update_event(Thread, data)
 
     def thread_delete(self, data: dict) -> tuple:
-        thread = self.cache[Thread].pop(Snowflake(data["id"]), None)
+        thread = self._delete_event(Thread, id=Snowflake(data["id"]))
         if thread is None:
             thread = Thread(**data)
 
@@ -149,7 +150,7 @@ class EventProcessor:
         return self._update_event(Guild, data)
 
     def guild_delete(self, data: dict) -> tuple:
-        guild = self.cache[Guild].pop(Snowflake(data["id"]))
+        guild = self._delete_event(Guild, id=Snowflake(data["id"]))
         return (guild,)
 
     def guild_ban_add(self, data: dict) -> tuple:
@@ -169,41 +170,63 @@ class EventProcessor:
         ...
 
     def guild_member_add(self, data: dict) -> tuple:
-        id = Snowflake(data["guild_id"]), Snowflake(data["id"])
+        guild_id = Snowflake(data["guild_id"])
+        id = guild_id, Snowflake(data["id"])
+
         guild_member = self._create_event(events.GuildMember, data, id=id)
 
         member = self._create_event(Member, data, id=id)
-        guild = self.cache[Guild].get(guild_member._guild_id)
+        guild = self.cache[Guild].get(guild_id)
         guild.members.append(member)
 
         return guild_member,
 
     def guild_member_update(self, data: dict) -> tuple:
-        id = Snowflake(data["guild_id"]), Snowflake(data["id"])
+        guild_id = Snowflake(data["guild_id"])
+        id = guild_id, Snowflake(data["id"])
+
         before, after = self._update_event(events.GuildMember, data, id=id)
 
-        member = self.cache[Member].get(id)
-        if member is None:
+        if self.cache[Member].get(id) is None:
             member = self._create_event(Member, data, id=id)
-
+            guild = self.cache[Guild].get(guild_id)
+            guild.members.append(member)
 
         return before, after
 
     def guild_member_remove(self, data: dict) -> tuple:
-        id = Snowflake(data["guild_id"]), Snowflake(data["id"])
-        ...
+        guild_id = Snowflake(data["guild_id"])
+        id = guild_id, Snowflake(data["user"]["id"])
+        guild_member = self._delete_event(events.GuildMember, id=id)
+
+        member = self._delete_event(Member, id=id)
+        if member is not None:
+            guild = self.cache[Guild].get(guild_id)
+
+            # TODO: Remove this line after refactoring Guild
+            [guild.members.pop(index) for index, _member in enumerate(guild.members) if _member.id == member.id]
+
+        return guild_member,
 
     def guild_members_chunk(self, data: dict) -> tuple:
-        ...
+        guild_members = events.GuildMembers(**data)
+        cache = self.cache[Member]
+
+        for member in guild_members.members:
+            cache.add(member, (guild_members.guild_id, member.id))
+
+        return guild_members,
 
     def guild_role_create(self, data: dict) -> tuple:
-        ...
+        role = self._create_event(Role, data["role"])
+
+        return role,
 
     def guild_role_update(self, data: dict) -> tuple:
-        ...
+        return self._update_event(Role, data["role"])
 
     def guild_role_delete(self, data: dict) -> tuple:
-        ...
+        return self._delete_event(Role, id=data["role_id"]),
 
     def guild_scheduled_event_create(self, data: dict) -> tuple:
         ...
