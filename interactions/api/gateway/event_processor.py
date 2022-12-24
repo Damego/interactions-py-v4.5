@@ -3,7 +3,7 @@ from typing import List, Union, Type, Tuple, Optional, TypeVar
 from ..http import HTTPClient
 from ..cache import Cache
 from ..models import gw as events
-from ..models.guild import Guild, StageInstance
+from ..models.guild import Guild, StageInstance, Invite
 from ..models.channel import Channel, Thread
 from ..models.misc import Snowflake, IDMixin
 from ..models.message import Message
@@ -62,19 +62,19 @@ class EventProcessor:
     # Discord events
 
     def application_command_permissions_update(self, data: dict) -> tuple:
-        ...
+        return events.ApplicationCommandPermissions(**data),
 
     def auto_moderation_rule_create(self, data: dict) -> tuple:
-        ...
+        return events.AutoModerationRule(**data),
 
     def auto_moderation_rule_update(self, data: dict) -> tuple:
-        ...
+        return events.AutoModerationRule(**data),
 
     def auto_moderation_rule_delete(self, data: dict) -> tuple:
-        ...
+        return events.AutoModerationRule(**data),
 
     def auto_moderation_action_execution(self, data: dict) -> tuple:
-        ...
+        return events.AutoModerationAction(**data),
 
     def channel_create(self, data: dict) -> tuple:
         channel = Channel(**data)
@@ -159,13 +159,31 @@ class EventProcessor:
         return self.guild_ban_add(data)
 
     def guild_emojis_update(self, data: dict) -> tuple:
-        ...
+        # TODO: emojis not stores in the cache
+        guild_emojis = events.GuildEmojis(**data)
+
+        # guild_emojis.emojis contains all emojis of the guild
+
+        guild = self.cache[Guild].get(guild_emojis.guild_id)
+        guild.emojis.clear()
+        guild.emojis.extend(guild_emojis.emojis)
+
+        return guild_emojis,
 
     def guild_stickers_update(self, data: dict) -> tuple:
-        ...
+        # TODO: stickers not stores in the cache
+        guild_stickers = events.GuildStickers(**data)
+
+        # guild_stickers.stickers contains all stickers of the guild
+
+        guild = self.cache[Guild].get(guild_stickers.guild_id)
+        guild.stickers.clear()
+        guild.stickers.extend(guild_stickers.stickers)
+
+        return guild_stickers,
 
     def guild_integrations_update(self, data: dict) -> tuple:
-        ...
+        return events.GuildIntegrations(**data),
 
     def guild_member_add(self, data: dict) -> tuple:
         guild_id = Snowflake(data["guild_id"])
@@ -227,37 +245,38 @@ class EventProcessor:
         return self._delete_event(Role, id=data["role_id"]),
 
     def guild_scheduled_event_create(self, data: dict) -> tuple:
-        ...
+        return self._create_event(events.GuildScheduledEvent, data),
 
     def guild_scheduled_event_update(self, data: dict) -> tuple:
-        ...
+        return self._update_event(events.GuildScheduledEvent, data)
 
     def guild_scheduled_event_delete(self, data: dict) -> tuple:
-        ...
+        scheduled_event = self._delete_event(events.GuildScheduledEvent, id=Snowflake(data["id"]))
+        if scheduled_event is None:
+            scheduled_event = events.GuildScheduledEvent(**data)
+
+        return scheduled_event,
 
     def guild_scheduled_event_user_add(self, data: dict) -> tuple:
-        ...
+        return events.GuildScheduledEventUser(**data),
 
     def guild_scheduled_event_user_remove(self, data: dict) -> tuple:
-        ...
+        return events.GuildScheduledEventUser(**data),
 
     def integration_create(self, data: dict) -> tuple:
-        ...
+        return events.Integration(**data),
 
     def integration_update(self, data: dict) -> tuple:
-        ...
+        return events.Integration(**data),
 
     def integration_delete(self, data: dict) -> tuple:
-        ...
-
-    def interaction_create(self, data: dict) -> tuple:
-        ...
+        return events.Integration(**data),
 
     def invite_create(self, data: dict) -> tuple:
-        ...
+        return Invite(**data),
 
     def invite_delete(self, data: dict) -> tuple:
-        ...
+        return Invite(**data),
 
     def message_create(self, data: dict) -> tuple:
         message = Message(**data)
