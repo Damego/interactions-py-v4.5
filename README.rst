@@ -2,17 +2,19 @@ interactions.py
 ===============
 
 
-What it is?
+What is it?
 ***********
 
-This is experimental branch or most likely prototype, my vision of version 4.5.0 for interactions.py.
-As you know v4.4.0 is the latest minor version of v4 major. Next versions will take v5 as major.
-It's will be different library with NAFF codebase.
-But i want to try improve v4 as i can.
-This branch should not be used in the production.
+This is a experimental version of interactions.py named v4.5.0. It's just an attempt to improve codebase.
+I don't garantie this version will work, so you should not use it in the production.
+
+**This version wont be merged in official interactions.py**
+
+Why?
+v4.4.0 is the latest minor version of interactions.py because NAFF merges into i.py and next version will be v5.
 
 To do
----------------
+-----
 
 - [ ] - Refactor event dispatching.
 - [ ] - Solve issue with different cached objects. Like we could have channel in cache and in ``guild.channels`` but it will be different objects.
