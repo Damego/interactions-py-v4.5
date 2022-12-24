@@ -1,17 +1,16 @@
-from typing import List, Union, Type, Tuple, Optional, TypeVar
+from typing import List, Optional, Tuple, Type, TypeVar, Union
 
-from ..http import HTTPClient
-from ..cache import Cache
-from ..models import gw as events
-from ..models.guild import Guild, StageInstance, Invite
-from ..models.channel import Channel, Thread
-from ..models.misc import Snowflake, IDMixin
-from ..models.message import Message
-from ..models.user import User
-from ..models.member import Member
-from ..models.role import Role
 from ...utils.attrs_utils import DictSerializerMixin
-
+from ..cache import Cache
+from ..http import HTTPClient
+from ..models import gw as events
+from ..models.channel import Channel, Thread
+from ..models.guild import Guild, Invite, StageInstance
+from ..models.member import Member
+from ..models.message import Message
+from ..models.misc import IDMixin, Snowflake
+from ..models.role import Role
+from ..models.user import User
 
 # TODO:
 #   Some create, update, delete events have same behavior. Need to split they into separate methods.
@@ -56,25 +55,27 @@ class EventProcessor:
 
         return before, cached_object
 
-    def _delete_event(self, model: Type[T], *, id: Union[Tuple[Snowflake, Snowflake], Snowflake]) -> Optional[T]:
+    def _delete_event(
+        self, model: Type[T], *, id: Union[Tuple[Snowflake, Snowflake], Snowflake]
+    ) -> Optional[T]:
         return self.cache[model].pop(id)
 
     # Discord events
 
     def application_command_permissions_update(self, data: dict) -> tuple:
-        return events.ApplicationCommandPermissions(**data),
+        return (events.ApplicationCommandPermissions(**data),)
 
     def auto_moderation_rule_create(self, data: dict) -> tuple:
-        return events.AutoModerationRule(**data),
+        return (events.AutoModerationRule(**data),)
 
     def auto_moderation_rule_update(self, data: dict) -> tuple:
-        return events.AutoModerationRule(**data),
+        return (events.AutoModerationRule(**data),)
 
     def auto_moderation_rule_delete(self, data: dict) -> tuple:
-        return events.AutoModerationRule(**data),
+        return (events.AutoModerationRule(**data),)
 
     def auto_moderation_action_execution(self, data: dict) -> tuple:
-        return events.AutoModerationAction(**data),
+        return (events.AutoModerationAction(**data),)
 
     def channel_create(self, data: dict) -> tuple:
         channel = Channel(**data)
@@ -130,13 +131,13 @@ class EventProcessor:
         return (thread,)
 
     def thread_tuple_sync(self, data: dict) -> tuple:
-        return events.ThreadList(**data),
+        return (events.ThreadList(**data),)
 
     def thread_member_update(self, data: dict) -> tuple:
-        return events.ThreadMember(**data),
+        return (events.ThreadMember(**data),)
 
     def thread_members_update(self, data: dict) -> tuple:
-        return events.ThreadMembers(**data),
+        return (events.ThreadMembers(**data),)
 
     def guild_create(self, data: dict) -> tuple:
         guild = Guild(**data)
@@ -168,7 +169,7 @@ class EventProcessor:
         guild.emojis.clear()
         guild.emojis.extend(guild_emojis.emojis)
 
-        return guild_emojis,
+        return (guild_emojis,)
 
     def guild_stickers_update(self, data: dict) -> tuple:
         # TODO: stickers not stores in the cache
@@ -180,10 +181,10 @@ class EventProcessor:
         guild.stickers.clear()
         guild.stickers.extend(guild_stickers.stickers)
 
-        return guild_stickers,
+        return (guild_stickers,)
 
     def guild_integrations_update(self, data: dict) -> tuple:
-        return events.GuildIntegrations(**data),
+        return (events.GuildIntegrations(**data),)
 
     def guild_member_add(self, data: dict) -> tuple:
         guild_id = Snowflake(data["guild_id"])
@@ -195,7 +196,7 @@ class EventProcessor:
         guild = self.cache[Guild].get(guild_id)
         guild.members.append(member)
 
-        return guild_member,
+        return (guild_member,)
 
     def guild_member_update(self, data: dict) -> tuple:
         guild_id = Snowflake(data["guild_id"])
@@ -220,9 +221,13 @@ class EventProcessor:
             guild = self.cache[Guild].get(guild_id)
 
             # TODO: Remove this line after refactoring Guild
-            [guild.members.pop(index) for index, _member in enumerate(guild.members) if _member.id == member.id]
+            [
+                guild.members.pop(index)
+                for index, _member in enumerate(guild.members)
+                if _member.id == member.id
+            ]
 
-        return guild_member,
+        return (guild_member,)
 
     def guild_members_chunk(self, data: dict) -> tuple:
         guild_members = events.GuildMembers(**data)
@@ -231,21 +236,21 @@ class EventProcessor:
         for member in guild_members.members:
             cache.add(member, (guild_members.guild_id, member.id))
 
-        return guild_members,
+        return (guild_members,)
 
     def guild_role_create(self, data: dict) -> tuple:
         role = self._create_event(Role, data["role"])
 
-        return role,
+        return (role,)
 
     def guild_role_update(self, data: dict) -> tuple:
         return self._update_event(Role, data["role"])
 
     def guild_role_delete(self, data: dict) -> tuple:
-        return self._delete_event(Role, id=data["role_id"]),
+        return (self._delete_event(Role, id=data["role_id"]),)
 
     def guild_scheduled_event_create(self, data: dict) -> tuple:
-        return self._create_event(events.GuildScheduledEvent, data),
+        return (self._create_event(events.GuildScheduledEvent, data),)
 
     def guild_scheduled_event_update(self, data: dict) -> tuple:
         return self._update_event(events.GuildScheduledEvent, data)
@@ -255,28 +260,28 @@ class EventProcessor:
         if scheduled_event is None:
             scheduled_event = events.GuildScheduledEvent(**data)
 
-        return scheduled_event,
+        return (scheduled_event,)
 
     def guild_scheduled_event_user_add(self, data: dict) -> tuple:
-        return events.GuildScheduledEventUser(**data),
+        return (events.GuildScheduledEventUser(**data),)
 
     def guild_scheduled_event_user_remove(self, data: dict) -> tuple:
-        return events.GuildScheduledEventUser(**data),
+        return (events.GuildScheduledEventUser(**data),)
 
     def integration_create(self, data: dict) -> tuple:
-        return events.Integration(**data),
+        return (events.Integration(**data),)
 
     def integration_update(self, data: dict) -> tuple:
-        return events.Integration(**data),
+        return (events.Integration(**data),)
 
     def integration_delete(self, data: dict) -> tuple:
-        return events.Integration(**data),
+        return (events.Integration(**data),)
 
     def invite_create(self, data: dict) -> tuple:
-        return Invite(**data),
+        return (Invite(**data),)
 
     def invite_delete(self, data: dict) -> tuple:
-        return Invite(**data),
+        return (Invite(**data),)
 
     def message_create(self, data: dict) -> tuple:
         message = Message(**data)

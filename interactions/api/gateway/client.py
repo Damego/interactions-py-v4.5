@@ -496,7 +496,7 @@ class WebSocketClient:
                     self.__unavailable_guilds, args[0]
                 )
                 if need_dispatch:
-                    self._dispatch.dispatch(f"on_guild_join", *args)
+                    self._dispatch.dispatch("on_guild_join", *args)
 
         # temporary
         if args is not None:
