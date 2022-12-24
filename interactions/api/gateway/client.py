@@ -33,21 +33,14 @@ from ..dispatch import Listener
 from ..error import LibraryException
 from ..http.client import HTTPClient
 from ..models.flags import Intents
-from ..models.guild import Guild
-from ..models.gw import GuildMember, GuildRole, VoiceState
-from ..models import gw as events
-from ..models.member import Member
-from ..models.message import Message
-from ..models.misc import Snowflake
 from ..models.presence import ClientPresence
-from ..models.role import Role
+from .event_processor import EventProcessor
 from .heartbeat import _Heartbeat
 from .ratelimit import WSRateLimit
 
 if TYPE_CHECKING:
     from ...client.context import _Context
-    from ..cache import Cache, Storage
-    from ..models.gw import GuildMembers
+    from ..cache import Cache
 
 log = get_logger("gateway")
 
@@ -121,6 +114,7 @@ class WebSocketClient:
         "_http",
         "_client",
         "_cache",
+        "_event_processor",
         "__closed",  # placeholder to work with variables atm. its event variant of "_closed"
         "_options",
         "_intents",
@@ -177,6 +171,7 @@ class WebSocketClient:
         )
         self._http: HTTPClient = token
         self._cache: "Cache" = cache
+        self._event_processor: Optional[EventProcessor] = None
 
         self._client: Optional["ClientWebSocketResponse"] = None
 
@@ -269,6 +264,7 @@ class WebSocketClient:
 
         if isinstance(self._http, str):
             self._http = HTTPClient(self._http, self._cache)
+            self._event_processor = EventProcessor(self._http)
 
         url = await self._http.get_gateway()
         self.ws_url = url
@@ -486,399 +482,22 @@ class WebSocketClient:
         name: str = event.lower()
         data["_client"] = self._http
 
-        cache: Cache = self._http.cache
-        args: list = []
+        try:
+            method = getattr(self._event_processor, name)
+        except AttributeError:
+            return log.warning(f"Got an unexpected event {event}.")
 
-        # TODO:
-        #   Move logic to separate class and split every event to own method
-        #   Combine similar events like guild_create, guild_update, guild_delete
-        #   Implement GatewayEvents enum.
+        args: tuple = method(data)
 
         match name:
-            case "application_command_permissions_update":
-                ...
-            case "auto_moderation_rule_create":
-                ...
-            case "auto_moderation_rule_update":
-                ...
-            case "auto_moderation_rule_delete":
-                ...
-            case "auto_moderation_action_execution":
-                ...
-            case "channel_create":
-                ...
-            case "channel_update":
-                ...
-            case "channel_delete":
-                ...
-            case "channel_pins_update":
-                ...
-            case "thread_create":
-                ...
-            case "thread_update":
-                ...
-            case "thread_delete":
-                ...
-            case "thread_list_sync":
-                ...
-            case "thread_member_update":
-                ...
-            case "thread_members_update":
-                ...
             case "guild_create":
-                guild = Guild(**data)
-                cache[Guild].add(guild)
+                need_dispatch: bool = self._event_processor.guild_join(
+                    self.__unavailable_guilds, args[0]
+                )
+                if need_dispatch:
+                    self._dispatch.dispatch(f"on_guild_join", *args)
 
-                args.append(guild)
-
-            case "guild_update":
-                guild = cache[Guild].get(Snowflake(data["id"]))
-                cached_guild = Guild(**guild._json, _client=self._http)
-                guild.update(data)
-
-                args.extend([cached_guild, guild])
-
-            case "guild_delete":
-                id = Snowflake(data["id"])
-                guild = cache[Guild].pop(id)
-
-                args.append(guild)
-
-            case "guild_ban_add":
-                ...
-            case "guild_ban_remove":
-                ...
-            case "guild_emojis_update":
-                ...
-            case "guild_stickers_update":
-                ...
-            case "guild_integrations_update":
-                ...
-            case "guild_member_add":
-                ...
-            case "guild_member_remove":
-                ...
-            case "guild_member_update":
-                ...
-            case "guild_members_chunk":
-                ...
-            case "guild_role_create":
-                ...
-            case "guild_role_update":
-                ...
-            case "guild_role_delete":
-                ...
-            case "guild_scheduled_event_create":
-                ...
-            case "guild_scheduled_event_update":
-                ...
-            case "guild_scheduled_event_delete":
-                ...
-            case "guild_scheduled_event_user_add":
-                ...
-            case "guild_scheduled_event_user_remove":
-                ...
-            case "integration_create":
-                ...
-            case "integration_update":
-                ...
-            case "integration_delete":
-                ...
-            case "interaction_create":
-                ...
-            case "invite_create":
-                ...
-            case "invite_delete":
-                ...
-            case "message_create":
-                ...
-            case "message_update":
-                ...
-            case "message_delete":
-                ...
-            case "message_delete_bulk":
-                ...
-            case "message_reaction_add":
-                ...
-            case "message_reaction_remove":
-                ...
-            case "message_reaction_remove_all":
-                ...
-            case "message_reaction_remove_emoji":
-                ...
-            case "presence_update":
-                ...
-            case "stage_instance_create":
-                ...
-            case "stage_instance_update":
-                ...
-            case "stage_instance_delete":
-                ...
-            case "typing_start":
-                ...
-            case "user_update":
-                ...
-            case "voice_state_update":
-                ...
-            case "voice_server_update":
-                ...
-            case "webhooks_update":
-                ...
-
-    # def _dispatch_discord_event(self, event: str, data: dict) -> None:
-    #     """
-    #     Dispatches a discord event from the Gateway.
-    #
-    #     :param str event: The name of the event.
-    #     :param dict data: The data for the event.
-    #     """
-    #     path: str = "interactions.api.models"
-    #     name: str = event.lower()
-    #     try:
-    #         data["_client"] = self._http
-    #
-    #         _event_path: list = [section.capitalize() for section in name.split("_")]
-    #         _name: str = _event_path[0] if len(_event_path) < 3 else "".join(_event_path[:-1])
-    #         model = getattr(__import__(path), _name)
-    #         obj = model(**data)
-    #
-    #         guild_obj = guild_model = None
-    #         if model is GuildRole:
-    #             guild_obj = obj.role
-    #             guild_model = Role
-    #         elif model is GuildMember:
-    #             guild_obj = Member(**data)
-    #             guild_model = Member
-    #
-    #         _cache: "Storage" = self._http.cache[model]
-    #         _guild_cache: "Storage" = self._http.cache[guild_model]
-    #
-    #         ids = None
-    #         id = self.__get_object_id(data, obj, model)
-    #         if id is None:
-    #             ids = self.__get_object_ids(obj, model)
-    #
-    #         if "_create" in name or "_add" in name:
-    #             if name == "guild_create":
-    #                 if id and str(id) in self.__unavailable_guilds:
-    #                     self.__unavailable_guilds.remove(str(id))
-    #                 else:
-    #                     self._dispatch.dispatch("on_guild_join", obj)
-    #
-    #             self._dispatch.dispatch(f"on_{name}", obj)
-    #
-    #             if id:
-    #                 _cache.merge(obj, id)
-    #                 if guild_obj:
-    #                     _guild_cache.add(guild_obj, id)
-    #
-    #             self.__modify_guild_cache(
-    #                 name, data, guild_model or model, guild_obj or obj, id, ids
-    #             )
-    #
-    #         elif "_update" in name:
-    #             self._dispatch.dispatch(f"on_raw_{name}", obj)
-    #
-    #             if not id and ids is None:
-    #                 return self._dispatch.dispatch(f"on_{name}", obj)
-    #
-    #             self.__modify_guild_cache(
-    #                 name, data, guild_model or model, guild_obj or obj, id, ids
-    #             )
-    #             if ids is not None:
-    #                 # Not cached, but it needed for guild_emojis_update and guild_stickers_update events
-    #                 return self._dispatch.dispatch(f"on_{name}", obj)
-    #             if id is None:
-    #                 return
-    #
-    #             if guild_obj:
-    #                 old_guild_obj = _guild_cache.get(id)
-    #                 if old_guild_obj:
-    #                     old_guild_obj.update(**guild_obj._json)
-    #                 else:
-    #                     _guild_cache.add(guild_obj, id)
-    #
-    #             old_obj = _cache.get(id)
-    #             if old_obj:
-    #                 before = model(**old_obj._json)
-    #                 old_obj.update(**data)
-    #             else:
-    #                 before = None
-    #                 old_obj = obj
-    #
-    #             _cache.add(old_obj, id)
-    #
-    #             if event == "VOICE_STATE_UPDATE" and not obj.channel_id:  # user left
-    #                 del _cache[obj.user_id]
-    #
-    #             self._dispatch.dispatch(
-    #                 f"on_{name}", before, old_obj
-    #             )  # give previously stored and new one
-    #
-    #         elif "_remove" in name or "_delete" in name:
-    #             self._dispatch.dispatch(
-    #                 f"on_raw_{name}", obj
-    #             )  # Deprecated. Remove this in the future.
-    #
-    #             old_obj = None
-    #             if id:
-    #                 _guild_cache.pop(id)
-    #                 self.__modify_guild_cache(
-    #                     name, data, guild_model or model, guild_obj or obj, id, ids
-    #                 )
-    #                 old_obj = _cache.pop(id)
-    #
-    #             elif ids is not None and "message" in name:
-    #                 # currently only message has '_delete_bulk' event but ig better keep this condition for future.
-    #                 _message_cache: "Storage" = self._http.cache[Message]
-    #                 for message_id in ids:
-    #                     _message_cache.pop(message_id)
-    #
-    #             self._dispatch.dispatch(f"on_{name}", old_obj or obj)
-    #
-    #         elif "guild_members_chunk" in name:
-    #             self.__modify_guild_cache(name, data, model, obj, ids=ids)
-    #
-    #             _member_cache: "Storage" = self._http.cache[Member]
-    #             obj: GuildMembers
-    #             for member in obj.members:
-    #                 member._guild_id = obj.guild_id
-    #                 _member_cache.add(member, (obj.guild_id, member.id))
-    #
-    #             self._dispatch.dispatch(f"on_{name}", obj)
-    #
-    #         else:
-    #             self._dispatch.dispatch(f"on_{name}", obj)
-    #
-    #     except AttributeError as error:
-    #         log.warning(f"An error occurred dispatching {name}: {error}")
-
-    def __get_object_id(
-        self, data: dict, obj: Any, model: type
-    ) -> Optional[Union[Snowflake, Tuple[Snowflake, Snowflake]]]:
-        """
-        Gets an ID from object.
-
-        :param dict data: The data for the event.
-        :param Any obj: The object of the event.
-        :param type model: The model of the event.
-        :return: Object ID
-        :rtype: Optional[Union[Snowflake, Tuple[Snowflake, Snowflake]]]
-        """
-        if isinstance(obj, (Member, GuildMember)):
-            id = (Snowflake(data["guild_id"]), obj.id)
-        if isinstance(obj, VoiceState):
-            id = obj.user_id
-        else:
-            id = getattr(obj, "id", None)
-        if id is not None:
-            return id
-
-        if model.__name__ == "GuildScheduledEventUser":
-            id = obj.guild_scheduled_event_id
-        elif model.__name__ == "Presence":
-            id = obj.user.id
-        elif model.__name__ in [
-            "GuildBan",
-            # Extend this for everything that starts with 'Guild' and should not be cached
-        ]:
-            id = None
-        elif model.__name__.startswith("Guild"):
-            model_name = model.__name__[5:].lower()
-            if (_data := getattr(obj, model_name, None)) and not isinstance(_data, list):
-                id = getattr(_data, "id") if not isinstance(_data, dict) else Snowflake(_data["id"])
-            elif hasattr(obj, f"{model_name}_id"):
-                id = getattr(obj, f"{model_name}_id", None)
-
-        return id
-
-    def __get_object_ids(self, obj: Any, model: type) -> Optional[List[Snowflake]]:
-        """
-        Gets a list of ids of object.
-
-        :param Any obj: The object of the event.
-        :param type model: The model of the event.
-        :return: Object IDs
-        :rtype: Optional[Union[Snowflake, Tuple[Snowflake, Snowflake]]]
-        """
-        ids = getattr(obj, "ids", None)
-        if ids is not None:
-            return ids
-
-        if model.__name__.startswith("Guild"):
-            model_name = model.__name__[5:].lower()
-            if (_data := getattr(obj, model_name, None)) is not None:
-                ids = [
-                    getattr(_obj, "id") if not isinstance(_obj, dict) else Snowflake(_obj["id"])
-                    for _obj in _data
-                ]
-
-        return ids
-
-    def __modify_guild_cache(
-        self,
-        name: str,
-        data: dict,
-        model: Any,
-        obj: Any,
-        id: Optional[Snowflake] = None,
-        ids: Optional[List[Snowflake]] = None,
-    ):
-        """
-        Modifies guild cache.
-
-        :param str event: The name of the event.
-        :param dict data: The data for the event.
-        :param Any obj: The object of the event.
-        :param Any model: The model of the event.
-        """
-        if not (
-            (guild_id := data.get("guild_id"))
-            and not isinstance(obj, Guild)
-            and "message" not in name
-            and (id is not None or ids is not None)
-            and (guild := self._http.cache[Guild].get(Snowflake(guild_id)))
-        ):
-            return
-
-        attr: str = model.__name__.lower()
-
-        if attr.startswith("guild"):
-            attr = attr[5:]
-        if attr == "threadmembers":  # TODO: Figure out why this here
-            return
-        if not attr.endswith("s"):
-            attr = f"{attr}s"
-        iterable = getattr(guild, attr, None)
-        if iterable is not None and isinstance(iterable, list):
-            if "_create" in name or "_add" in name:
-                iterable.append(obj)
-            elif id:
-                _id = id[1] if isinstance(id, tuple) else id
-                for index, __obj in enumerate(iterable):
-                    if __obj.id == _id:
-                        if "_remove" in name or "_delete" in name:
-                            iterable.remove(__obj)
-
-                        elif "_update" in name and hasattr(obj, "id"):
-                            iterable[index] = obj
-                        break
-            elif ids is not None and (objs := getattr(obj, attr, None)) is not None:
-                if "_update" in name:
-                    iterable.clear()
-                    iterable.extend(objs)
-                elif "_chunk" in name:
-                    for _obj in objs:
-                        for index, __obj in enumerate(iterable):
-                            if __obj.id == _obj.id:
-                                iterable[index] = _obj
-                                break
-                        else:
-                            iterable.append(_obj)
-
-            setattr(guild, attr, iterable)
-
-        self._http.cache[Guild].add(guild)
+        self._dispatch.dispatch(f"on_{name}", *args)
 
     def __contextualize(self, data: dict) -> "_Context":
         """
