@@ -130,13 +130,13 @@ class EventProcessor:
         return (thread,)
 
     def thread_tuple_sync(self, data: dict) -> tuple:
-        ...
+        return events.ThreadList(**data),
 
     def thread_member_update(self, data: dict) -> tuple:
-        ...
+        return events.ThreadMember(**data),
 
     def thread_members_update(self, data: dict) -> tuple:
-        ...
+        return events.ThreadMembers(**data),
 
     def guild_create(self, data: dict) -> tuple:
         guild = Guild(**data)
