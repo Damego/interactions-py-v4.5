@@ -15,3 +15,5 @@ __pycache__
 *.token
 *.pypirc
 *.code-workspace
+test-bot.py
+test.py
