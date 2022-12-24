@@ -15,6 +15,6 @@ To do
 ---------------
 
 - [ ] - Refactor event dispatching.
+- [ ] - Solve issue with different cached objects. Like we could have channel in cache and in ``guild.channels`` but it will be different objects.
 - [ ] - Rewrite gateway with using ``anyio`` library.
 - [ ] - Use ``cattrs`` to [un]structure dataclasses.
-- [ ] - Solve issue with different cached objects. Like we could have channel in cache and in guild.channels but it's will be different objects.
