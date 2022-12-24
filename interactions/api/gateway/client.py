@@ -489,6 +489,7 @@ class WebSocketClient:
 
         args: tuple = method(data)
 
+        # I don't like this but idk
         match name:
             case "guild_create":
                 need_dispatch: bool = self._event_processor.guild_join(
@@ -497,7 +498,9 @@ class WebSocketClient:
                 if need_dispatch:
                     self._dispatch.dispatch(f"on_guild_join", *args)
 
-        self._dispatch.dispatch(f"on_{name}", *args)
+        # temporary
+        if args is not None:
+            self._dispatch.dispatch(f"on_{name}", *args)
 
     def __contextualize(self, data: dict) -> "_Context":
         """
