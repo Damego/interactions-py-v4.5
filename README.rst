@@ -11,10 +11,10 @@ It's will be different library with NAFF codebase.
 But i want to try improve v4 as i can.
 This branch should not be used in the production.
 
-What will be changed?
+To do
 ---------------
 
-- Change minimal version of python to 3.10
-- Rewrite gateway with using ``anyio`` library.
-- Refactor event dispatching.
-- Use ``cattrs`` to [un]structure dataclasses.
+- [ ] - Refactor event dispatching.
+- [ ] - Rewrite gateway with using ``anyio`` library.
+- [ ] - Use ``cattrs`` to [un]structure dataclasses.
+- [ ] - Solve issue with different cached objects. Like we could have channel in cache and in guild.channels but it's will be different objects.
