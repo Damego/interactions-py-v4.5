@@ -34,7 +34,7 @@ from ..error import LibraryException
 from ..http.client import HTTPClient
 from ..models.flags import Intents
 from ..models.presence import ClientPresence
-from .event_processor import EventProcessor
+from .processors import Processor
 from .heartbeat import _Heartbeat
 from .ratelimit import WSRateLimit
 
@@ -171,7 +171,7 @@ class WebSocketClient:
         )
         self._http: HTTPClient = token
         self._cache: "Cache" = cache
-        self._event_processor: Optional[EventProcessor] = None
+        self._event_processor: Optional[Processor] = None
 
         self._client: Optional["ClientWebSocketResponse"] = None
 
@@ -264,7 +264,7 @@ class WebSocketClient:
 
         if isinstance(self._http, str):
             self._http = HTTPClient(self._http, self._cache)
-            self._event_processor = EventProcessor(self._http)
+            self._event_processor = Processor(self._http)
 
         url = await self._http.get_gateway()
         self.ws_url = url
@@ -490,17 +490,14 @@ class WebSocketClient:
         args: tuple = method(data)
 
         # I don't like this but idk
-        match name:
-            case "guild_create":
-                need_dispatch: bool = self._event_processor.guild_join(
-                    self.__unavailable_guilds, args[0]
-                )
-                if need_dispatch:
-                    self._dispatch.dispatch("on_guild_join", *args)
+        if name == "guild_create":
+            guild_id = str(args[0].id)
+            if guild_id in self.__unavailable_guilds:
+                self.__unavailable_guilds.remove(guild_id)
+            else:
+                self._dispatch.dispatch("on_guild_join", *args)
 
-        # temporary
-        if args is not None:
-            self._dispatch.dispatch(f"on_{name}", *args)
+        self._dispatch.dispatch(f"on_{name}", *args)
 
     def __contextualize(self, data: dict) -> "_Context":
         """
