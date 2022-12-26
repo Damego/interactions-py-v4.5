@@ -4,6 +4,8 @@ from urllib.parse import quote
 from ..models.channel import Channel
 from ..models.guild import Guild
 from ..models.role import Role
+from ..models.member import Member
+from ..models.misc import Snowflake
 from .request import _Request
 from .route import Route
 
@@ -42,9 +44,7 @@ class GuildRequest:
 
         request = await self._req.request(Route("GET", "/users/@me/guilds"), params=params)
 
-        for guild in request:
-            if guild.get("id"):
-                self.cache[Guild].merge(Guild(**guild, _client=self))
+        [self.cache[Guild].merge(Guild(**guild, _client=self)) for guild in request]
 
         return request
 
@@ -85,9 +85,13 @@ class GuildRequest:
         :rtype: dict
         """
 
-        return await self._req.request(
+        response = await self._req.request(
             Route("PATCH", f"/guilds/{guild_id}"), json=payload, reason=reason
         )
+
+        self.cache[Guild].merge(Guild(**response, _client=self))
+
+        return response
 
     async def leave_guild(self, guild_id: int) -> None:
         """
@@ -96,9 +100,11 @@ class GuildRequest:
         :param guild_id: The guild snowflake ID associated.
         :return: None
         """
-        return await self._req.request(
+        await self._req.request(
             Route("DELETE", f"/users/@me/guilds/{guild_id}", guild_id=guild_id)
         )
+
+        self.cache[Guild].pop(Snowflake(guild_id))
 
     async def delete_guild(self, guild_id: int) -> None:
         """
@@ -106,7 +112,9 @@ class GuildRequest:
 
         :param guild_id: Guild ID snowflake.
         """
-        return await self._req.request(Route("DELETE", f"/guilds/{guild_id}"))
+        await self._req.request(Route("DELETE", f"/guilds/{guild_id}"))
+
+        self.cache[Guild].pop(Snowflake(guild_id))
 
     async def get_guild_widget(self, guild_id: int) -> dict:
         """
@@ -291,10 +299,14 @@ class GuildRequest:
         }
         if icon:
             payload["icon"] = icon
-        return await self._req.request(
+        response = await self._req.request(
             Route("POST", f"/guilds/templates/{template_code}"),
             json=payload,
         )
+
+        self.cache[Guild].add(Guild(**response, _client=self))
+
+        return response
 
     async def get_guild_template(self, template_code: str) -> dict:
         """
@@ -393,9 +405,7 @@ class GuildRequest:
             Route("GET", "/guilds/{guild_id}/channels", guild_id=guild_id)
         )
 
-        for channel in request:
-            if channel.get("id"):
-                self.cache[Channel].merge(Channel(**channel, _client=self))
+        [self.cache[Channel].merge(Channel(**channel, _client=self)) for channel in request]
 
         return request
 
@@ -410,9 +420,7 @@ class GuildRequest:
             Route("GET", "/guilds/{guild_id}/roles", guild_id=guild_id)
         )
 
-        for role in request:
-            if role.get("id"):
-                self.cache[Role].merge(Role(**role))
+        [self.cache[Role].merge(Role(**role, _client=self)) for role in request]
 
         return request
 
@@ -431,6 +439,8 @@ class GuildRequest:
             Route("POST", f"/guilds/{guild_id}/roles"), json=payload, reason=reason
         )
 
+        self.cache[Role].add(Role(**request, _client=self))
+
         return request
 
     async def modify_guild_role_positions(
@@ -444,11 +454,15 @@ class GuildRequest:
         :param reason: The reason for this action, if given.
         :return: List of guild roles with updated hierarchy.
         """
-        return await self._req.request(
+        response = await self._req.request(
             Route("PATCH", f"/guilds/{guild_id}/roles"),
             json=payload,
             reason=reason,
         )
+
+        [self.cache[Role].merge(Role(**role, _client=self)) for role in response]
+
+        return response
 
     async def modify_guild_role(
         self, guild_id: int, role_id: int, payload: dict, reason: Optional[str] = None
@@ -462,9 +476,12 @@ class GuildRequest:
         :param reason: The reason for this action, if given.
         :return: Updated role object.
         """
-        return await self._req.request(
+        response = await self._req.request(
             Route("PATCH", f"/guilds/{guild_id}/roles/{role_id}"), json=payload, reason=reason
         )
+        self.cache[Role].merge(Role(**response, _client=self))
+
+        return response
 
     async def delete_guild_role(self, guild_id: int, role_id: int, reason: str = None) -> None:
         """
@@ -474,9 +491,11 @@ class GuildRequest:
         :param role_id: Role ID snowflake.
         :param reason: The reason for this action, if any.
         """
-        return await self._req.request(
+        await self._req.request(
             Route("DELETE", f"/guilds/{guild_id}/roles/{role_id}"), reason=reason
         )
+
+        self.cache[Role].pop(Snowflake(guild_id))
 
     async def create_guild_kick(
         self, guild_id: int, user_id: int, reason: Optional[str] = None
@@ -496,6 +515,8 @@ class GuildRequest:
 
         await self._req.request(r)
 
+        self.cache[Member].pop((Snowflake(guild_id), Snowflake(user_id)))
+
     async def create_guild_ban(
         self,
         guild_id: int,
@@ -512,11 +533,12 @@ class GuildRequest:
         :param reason: Optional reason to ban.
         """
 
-        return await self._req.request(
+        await self._req.request(
             Route("PUT", f"/guilds/{guild_id}/bans/{user_id}"),
             json={"delete_message_seconds": delete_message_seconds},
             reason=reason,
         )
+        self.cache[Member].pop((Snowflake(guild_id), Snowflake(user_id)))
 
     async def remove_guild_ban(
         self, guild_id: int, user_id: int, reason: Optional[str] = None
