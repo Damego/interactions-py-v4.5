@@ -266,36 +266,6 @@ class GuildJoinRequest(DictSerializerMixin):
 
 
 @define()
-class GuildMember(Member):
-    """
-    A class object representing the gateway events ``GUILD_MEMBER_ADD``, ``GUILD_MEMBER_UPDATE`` and ``GUILD_MEMBER_REMOVE``.
-
-    .. versionchanged:: 4.3.2
-        GuildMember now subclasses :class:`.Member`.
-
-    .. note::
-        ``pending`` and ``permissions`` only apply for members retroactively
-        requiring to verify rules via. membership screening or lack permissions
-        to speak.
-
-    :ivar Snowflake guild_id: The guild ID.
-    :ivar User user: The user of the guild.
-    :ivar str nick: The nickname of the member.
-    :ivar Optional[str] avatar: The hash containing the user's guild avatar, if applicable.
-    :ivar List[int] roles: The list of roles of the member.
-    :ivar datetime joined_at: The timestamp the member joined the guild at.
-    :ivar datetime premium_since: The timestamp the member has been a server booster since.
-    :ivar bool deaf: Whether the member is deafened.
-    :ivar bool mute: Whether the member is muted.
-    :ivar Optional[bool] pending: Whether the member is pending to pass membership screening.
-    :ivar Optional[Permissions] permissions: Whether the member has permissions.
-    :ivar Optional[str] communication_disabled_until: How long until they're unmuted, if any.
-    """
-
-    _guild_id: Snowflake = field(converter=Snowflake, discord_name="guild_id")
-
-
-@define()
 class GuildMembers(DictSerializerMixin):
     """
     A class object representing the gateway event ``GUILD_MEMBERS_CHUNK``.
