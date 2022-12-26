@@ -13,6 +13,7 @@ from typing import (
     Optional,
     Tuple,
     Union,
+    Set
 )
 from warnings import warn
 
@@ -369,9 +370,6 @@ class Guild(ClientSerializerMixin, IDMixin):
     :ivar Optional[bool] large: Whether the guild is considered "large."
     :ivar Optional[bool] unavailable: Whether the guild is unavailable to access.
     :ivar Optional[int] member_count: The amount of members in the guild.
-    :ivar Optional[List[Member]] members: The members in the guild.
-    :ivar Optional[List[Channel]] channels: The channels in the guild.
-    :ivar Optional[List[Thread]] threads: All known threads in the guild.
     :ivar Optional[List[PresenceUpdate]] presences: The list of presences in the guild.
     :ivar Optional[int] max_presences: The maximum amount of presences allowed in the guild.
     :ivar Optional[int] max_members: The maximum amount of members allowed in the guild.
@@ -409,7 +407,6 @@ class Guild(ClientSerializerMixin, IDMixin):
     verification_level: int = field(default=0)
     default_message_notifications: int = field(default=0)
     explicit_content_filter: int = field(default=0)
-    roles: List[Role] = field(converter=convert_list(Role), factory=list, add_client=True)
     emojis: List[Emoji] = field(converter=convert_list(Emoji), factory=list, add_client=True)
     mfa_level: int = field(default=0)
     application_id: Optional[Snowflake] = field(converter=Snowflake, default=None)
@@ -420,15 +417,6 @@ class Guild(ClientSerializerMixin, IDMixin):
     large: Optional[bool] = field(default=None)
     unavailable: Optional[bool] = field(default=None)
     member_count: Optional[int] = field(default=None)
-    members: Optional[List[Member]] = field(
-        converter=convert_list(Member), default=None, add_client=True
-    )
-    channels: Optional[List[Channel]] = field(
-        converter=convert_list(Channel), default=None, add_client=True
-    )
-    threads: Optional[List[Thread]] = field(
-        converter=convert_list(Thread), default=None, add_client=True
-    )  # threads, because of their metadata
     presences: Optional[List[PresenceActivity]] = field(
         converter=convert_list(PresenceActivity), default=None
     )
@@ -455,45 +443,36 @@ class Guild(ClientSerializerMixin, IDMixin):
     features: List[str] = field()
     premium_progress_bar_enabled: Optional[bool] = field(default=None)
 
-    # todo assign the correct type
+    _member_ids: Set[Snowflake] = field(factory=list)
+    _role_ids: Set[Snowflake] = field(factory=list)
+    _channel_ids: Set[Snowflake] = field(factory=list)
+    _thread_ids: Set[Snowflake] = field(factory=list)
 
-    def __attrs_post_init__(self):  # sourcery skip: last-if-guard
-        if self._client:
-            # update the cache to include info found from guilds
-            # these values wouldn't be "found out" until an update for them happened otherwise
-            if self.channels:
-                self._client.cache[Channel].update({c.id: c for c in self.channels})
-            if self.threads:
-                self._client.cache[Thread].update({t.id: t for t in self.threads})
-            if self.roles:
-                self._client.cache[Role].update({r.id: r for r in self.roles})
-            if self.members:
-                self._client.cache[Member].update({(self.id, m.id): m for m in self.members})
+    def __attrs_post_init__(self):
+        self._member_ids = {Snowflake(member["id"]) for member in self._extras["members"]}
+        self._role_ids = {Snowflake(role["id"]) for role in self._extras["roles"]}
+        self._channel_ids = {Snowflake(channel["id"]) for channel in self._extras["channels"]}
+        self._thread_ids = {Snowflake(thread["id"]) for thread in self._extras["threads"]}
 
-            if guild := self._client.cache[Guild].get(self.id):
-                if not self.channels:
-                    self.channels = guild.channels
-                if not self.threads:
-                    self.threads = guild.threads
-                if not self.roles:
-                    self.roles = guild.roles
-                if not self.members:
-                    self.members = guild.members
-                if not self.member_count:
-                    self.member_count = guild.member_count
-                if not self.presences:
-                    self.presences = guild.presences
-                if not self.emojis:
-                    self.emojis = guild.emojis
+    @property
+    def members(self) -> List[Member]:
+        cache = self._client.cache[Member]
+        return [cache.get(self.id, id) for id in self._member_ids]
 
-        if self.members:
-            for member in self.members:
-                if (
-                    not member._extras.get("guild_id")
-                    or hasattr(member, "_guild_id")
-                    and not member._guild_id
-                ):
-                    member._extras["guild_id"] = self.id
+    @property
+    def roles(self) -> List[Role]:
+        cache = self._client.cache[Role]
+        return [cache.get(id) for id in self._role_ids]
+
+    @property
+    def channel(self) -> List[Channel]:
+        cache = self._client.cache[Channel]
+        return [cache.get(id) for id in self._channel_ids]
+
+    @property
+    def threads(self) -> List[Thread]:
+        cache = self._client.cache[Thread]
+        return [cache.get(id) for id in self._thread_ids]
 
     @property
     def voice_states(self) -> List["VoiceState"]:
@@ -746,10 +725,11 @@ class Guild(ClientSerializerMixin, IDMixin):
             reason=reason,
             payload=payload,
         )
-        if self.roles is None:
-            self.roles = []
+
         role = Role(**res, _client=self._client)
-        self.roles.append(role)
+
+        self._client.cache[Role].add(role)
+
         return role
 
     async def get_member(
@@ -767,19 +747,14 @@ class Guild(ClientSerializerMixin, IDMixin):
         """
         if not self._client:
             raise LibraryException(code=13)
+
         res = await self._client.get_member(
             guild_id=int(self.id),
             member_id=int(member_id),
         )
         member = Member(**res, _client=self._client, guild_id=self.id)
-        if self.members is None:
-            self.members = []
-        for index, _member in enumerate(self.members):
-            if int(_member.id) == int(member_id):
-                self.members[index] = member
-                break
-        else:
-            self.members.append(member)
+
+        self._client.cache[Member].add(member, id=(self.id, member.id))
         return member
 
     async def delete_channel(
@@ -799,11 +774,7 @@ class Guild(ClientSerializerMixin, IDMixin):
         _channel_id = int(channel_id.id) if isinstance(channel_id, Channel) else int(channel_id)
         await self._client.delete_channel(_channel_id)
 
-        if not self.channels:
-            return
-        for channel in self.channels:
-            if int(channel.id) == _channel_id:
-                return self.channels.remove(channel)
+        self._client.cache[Channel].pop(Snowflake(_channel_id))
 
     async def delete_role(
         self,
@@ -829,11 +800,7 @@ class Guild(ClientSerializerMixin, IDMixin):
             reason=reason,
         )
 
-        if not self.roles:
-            return
-        for role in self.roles:
-            if int(role.id) == _role_id:
-                return self.roles.remove(role)
+        self._client.cache[Role].pop(Snowflake(_role_id))
 
     async def modify_role(
         self,
@@ -896,16 +863,11 @@ class Guild(ClientSerializerMixin, IDMixin):
             payload=payload,
             reason=reason,
         )
-        _role = Role(**res, _client=self._client)
-        if self.roles is None:
-            self.roles = []
-        for index, item in enumerate(self.roles):
-            if int(item.id) == int(role.id):
-                self.roles[index] = _role
-                break
-        else:
-            self.roles.append(_role)
-        return _role
+        role = Role(**res, _client=self._client)
+
+        self._client.cache[Role].merge(role)
+
+        return role
 
     async def create_thread(
         self,
@@ -916,7 +878,7 @@ class Guild(ClientSerializerMixin, IDMixin):
         invitable: Optional[bool] = MISSING,
         message_id: Optional[Union[int, Snowflake, "Message"]] = MISSING,
         reason: Optional[str] = None,
-    ) -> Channel:
+    ) -> Thread:
         """
         .. versionadded:: 4.1.0
 
@@ -930,7 +892,7 @@ class Guild(ClientSerializerMixin, IDMixin):
         :param Optional[Union[int, Snowflake, Message]] message_id: An optional message to create a thread from.
         :param Optional[str] reason: An optional reason for the audit log
         :return: The created thread
-        :rtype: Channel
+        :rtype: Thread
         """
         if not self._client:
             raise LibraryException(code=13)
@@ -961,7 +923,11 @@ class Guild(ClientSerializerMixin, IDMixin):
             reason=reason,
         )
 
-        return Channel(**res, _client=self._client)
+        thread = Thread(**res, _client=self._client)
+
+        self._client.cache[Thread].add(thread)
+
+        return thread
 
     async def create_channel(
         self,
@@ -1047,10 +1013,9 @@ class Guild(ClientSerializerMixin, IDMixin):
             payload=payload,
         )
 
-        if self.channels is None:
-            self.channels = []
         channel = Channel(**res, _client=self._client)
-        self.channels.append(channel)
+        self._client.cache[Channel].add(channel)
+
         return channel
 
     async def clone_channel(self, channel_id: Union[int, Snowflake, Channel]) -> Channel:
@@ -1189,19 +1154,11 @@ class Guild(ClientSerializerMixin, IDMixin):
             payload=payload,
         )
 
-        _channel = Channel(**res, _client=self._client)
+        channel = Channel(**res, _client=self._client)
 
-        if self.channels is None:
-            self.channels = []
+        self._client.cache[Channel].merge(channel)
 
-        for index, item in enumerate(self.channels):
-            if int(item.id) == int(ch.id):
-                self.channels[index] = _channel
-                break
-        else:
-            self.channels.append(_channel)
-
-        return _channel
+        return channel
 
     async def modify_member(
         self,
