@@ -173,27 +173,56 @@ class ThreadRequest:
         :param reason: An optional reason for the audit log
         :return: The created thread
         """
-        payload = {"name": name}
-        if auto_archive_duration:
-            payload["auto_archive_duration"] = auto_archive_duration
         if message_id:
-            request = await self._req.request(
-                Route("POST", f"/channels/{channel_id}/messages/{message_id}/threads"),
-                json=payload,
-                reason=reason,
-            )
-            if request.get("id"):
-                self.cache[Thread].add(Thread(**request, _client=self))
-                return request
+            return await self.create_thread_from_message(channel_id, message_id, name, auto_archive_duration)
 
-        payload["type"] = thread_type
-        payload["invitable"] = invitable
+        payload = {
+            "name": name,
+        }
+
+        if thread_type is not None:
+            payload["type"] = thread_type
+        if invitable is not None:
+            payload["invitable"] = invitable
+        if auto_archive_duration is not None:
+            payload["auto_archive_duration"] = auto_archive_duration
+
         request = await self._req.request(
             Route("POST", f"/channels/{channel_id}/threads"), json=payload, reason=reason
         )
-        if request.get("id"):
-            self.cache[Thread].add(Thread(**request, _client=self))
+        self.cache[Thread].add(Thread(**request, _client=self))
 
+        return request
+
+    async def create_thread_from_message(
+        self,
+        channel_id: int,
+        message_id: int,
+        name: str,
+        auto_archive_duration: Optional[int] = None,
+        reason: Optional[int] = None
+    ) -> dict:
+        """
+        From a given channel, create a Thread with a message to start with.
+
+        :param channel_id: The ID of the channel to create this thread in
+        :param message_id: An optional message to create a thread from.
+        :param name: The name of the thread
+        :param auto_archive_duration: duration in minutes to automatically archive the thread after recent activity,
+            can be set to: 60, 1440, 4320, 10080
+        :param reason: An optional reason for the audit log
+        :return: The created thread
+        """
+        payload = {"name": name}
+        if auto_archive_duration:
+            payload["auto_archive_duration"] = auto_archive_duration
+
+        request = await self._req.request(
+            Route("POST", f"/channels/{channel_id}/messages/{message_id}/threads"),
+            json=payload,
+            reason=reason,
+        )
+        self.cache[Thread].add(Thread(**request, _client=self))
         return request
 
     async def create_thread_in_forum(
