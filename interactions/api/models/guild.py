@@ -11,9 +11,9 @@ from typing import (
     List,
     Literal,
     Optional,
+    Set,
     Tuple,
     Union,
-    Set
 )
 from warnings import warn
 
@@ -273,10 +273,7 @@ class AsyncMembersIterator(DiscordPaginationIterator):
             self.__stop = True
 
         self.object_count += limit
-        self.objects = [
-            self._client.cache[Member].get(member["id"])
-            for member in members
-        ]
+        self.objects = [self._client.cache[Member].get(member["id"]) for member in members]
         member_ids = self._client.cache[Guild].get(Snowflake(self.object_id))._member_ids
         [member_ids.add(member.id) for member in self.objects]
 
@@ -293,12 +290,7 @@ class AsyncMembersIterator(DiscordPaginationIterator):
 
         self.object_count += limit
 
-        self.objects.extend(
-            [
-                self._client.cache[Member].get(member["id"])
-                for member in members
-            ]
-        )
+        self.objects.extend([self._client.cache[Member].get(member["id"]) for member in members])
         member_ids = self._client.cache[Guild].get(Snowflake(self.object_id))._member_ids
         [member_ids.add(member.id) for member in self.objects]
 
@@ -466,19 +458,34 @@ class Guild(ClientSerializerMixin, IDMixin):
             }
         )
         cache[Role].update(
-            {Snowflake(role["id"]): Role(role, _client=self._client) for role in self._extras["roles"]}
+            {
+                Snowflake(role["id"]): Role(role, _client=self._client)
+                for role in self._extras["roles"]
+            }
         )
         cache[Channel].update(
-            {Snowflake(channel["id"]): Channel(channel, _client=self._client) for channel in self._extras["channels"]}
+            {
+                Snowflake(channel["id"]): Channel(channel, _client=self._client)
+                for channel in self._extras["channels"]
+            }
         )
         cache[Thread].update(
-            {Snowflake(thread["id"]): Thread(thread, _client=self._client) for thread in self._extras["threads"]}
+            {
+                Snowflake(thread["id"]): Thread(thread, _client=self._client)
+                for thread in self._extras["threads"]
+            }
         )
         cache[Emoji].update(
-            {Snowflake(emoji["id"]): Emoji(emoji, _client=self._client) for emoji in self._extras["emojis"]}
+            {
+                Snowflake(emoji["id"]): Emoji(emoji, _client=self._client)
+                for emoji in self._extras["emojis"]
+            }
         )
         cache[Sticker].update(
-            {Snowflake(sticker["id"]): Sticker(sticker, _client=self._client) for sticker in self._extras["stickers"]}
+            {
+                Snowflake(sticker["id"]): Sticker(sticker, _client=self._client)
+                for sticker in self._extras["stickers"]
+            }
         )
 
         self._member_ids = {Snowflake(member["id"]) for member in self._extras["members"]}
@@ -1137,7 +1144,9 @@ class Guild(ClientSerializerMixin, IDMixin):
         if nsfw is not MISSING:
             payload["nsfw"] = nsfw
         if permission_overwrites is not MISSING:
-            payload["permission_overwrites"] = [overwrite._json for overwrite in permission_overwrites]
+            payload["permission_overwrites"] = [
+                overwrite._json for overwrite in permission_overwrites
+            ]
         if archived is not MISSING:
             payload["archived"] = archived
         if auto_archive_duration is not MISSING:
@@ -1772,7 +1781,9 @@ class Guild(ClientSerializerMixin, IDMixin):
         if not self._client:
             raise LibraryException(code=13)
         if entity_type == EntityType.EXTERNAL and entity_metadata is MISSING:
-            raise LibraryException(message="entity_metadata is required for external events!", code=12)
+            raise LibraryException(
+                message="entity_metadata is required for external events!", code=12
+            )
         if entity_type == EntityType.EXTERNAL and scheduled_end_time is MISSING:
             raise LibraryException(message="External events require an end time!")
 
@@ -1937,7 +1948,10 @@ class Guild(ClientSerializerMixin, IDMixin):
         """
         return await self.modify_role_positions(
             changes=[
-                {"id": int(role_id.id if isinstance(role_id, Role) else role_id), "position": position}
+                {
+                    "id": int(role_id.id if isinstance(role_id, Role) else role_id),
+                    "position": position,
+                }
             ],
             reason=reason,
         )
@@ -2403,10 +2417,7 @@ class Guild(ClientSerializerMixin, IDMixin):
 
         [self._member_ids.add(Snowflake(member["id"])) for member in res]
 
-        return [
-            self._client.cache[Member].get(Snowflake(member["id"]))
-            for member in res
-        ]
+        return [self._client.cache[Member].get(Snowflake(member["id"])) for member in res]
 
     async def get_all_members(self) -> List[Member]:
         """

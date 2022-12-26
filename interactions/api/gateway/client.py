@@ -34,8 +34,8 @@ from ..error import LibraryException
 from ..http.client import HTTPClient
 from ..models.flags import Intents
 from ..models.presence import ClientPresence
-from .processors import Processor
 from .heartbeat import _Heartbeat
+from .processors import Processor
 from .ratelimit import WSRateLimit
 
 if TYPE_CHECKING:

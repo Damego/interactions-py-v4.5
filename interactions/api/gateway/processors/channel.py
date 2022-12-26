@@ -1,8 +1,8 @@
-from .base import BaseProcessor
 from ...models import gw as events
+from ...models.channel import Channel, Thread
 from ...models.guild import Guild, StageInstance
 from ...models.misc import Snowflake
-from ...models.channel import Channel, Thread
+from .base import BaseProcessor
 
 
 class ChannelProcessor(BaseProcessor):

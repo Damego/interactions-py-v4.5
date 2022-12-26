@@ -738,7 +738,6 @@ class Channel(ClientSerializerMixin, IDMixin):
 
         return self._client.cache[Message].get(Snowflake(res["id"]))
 
-
     async def delete(self) -> None:
         """
         .. versionadded:: 4.0.2
@@ -829,7 +828,9 @@ class Channel(ClientSerializerMixin, IDMixin):
         if nsfw is not MISSING:
             payload["nsfw"] = nsfw
         if permission_overwrites is not MISSING:
-            payload["permission_overwrites"] = [overwrite._json for overwrite in permission_overwrites]
+            payload["permission_overwrites"] = [
+                overwrite._json for overwrite in permission_overwrites
+            ]
         if archived is not MISSING:
             payload["archived"] = archived
         if auto_archive_duration is not MISSING:
@@ -1693,7 +1694,9 @@ class Channel(ClientSerializerMixin, IDMixin):
             raise LibraryException(code=13)
 
         if self.type != ChannelType.GUILD_FORUM:
-            raise LibraryException(code=14, message="ForumTag can only be created in forum channels!")
+            raise LibraryException(
+                code=14, message="ForumTag can only be created in forum channels!"
+            )
 
         if emoji_id is not MISSING and emoji_id and emoji_name and emoji_name is not MISSING:
             raise LibraryException(
@@ -1743,7 +1746,9 @@ class Channel(ClientSerializerMixin, IDMixin):
             )
 
         if self.type != ChannelType.GUILD_FORUM:
-            raise LibraryException(code=14, message="ForumTag can only be created in forum channels!")
+            raise LibraryException(
+                code=14, message="ForumTag can only be created in forum channels!"
+            )
 
         _tag_id = int(tag_id.id if isinstance(tag_id, ForumTag) else tag_id)
 
@@ -1774,7 +1779,9 @@ class Channel(ClientSerializerMixin, IDMixin):
             raise LibraryException(code=13)
 
         if self.type != ChannelType.GUILD_FORUM:
-            raise LibraryException(code=14, message="ForumTag can only be created in forum channels!")
+            raise LibraryException(
+                code=14, message="ForumTag can only be created in forum channels!"
+            )
 
         _tag_id = int(tag_id.id) if isinstance(tag_id, ForumTag) else int(tag_id)
 

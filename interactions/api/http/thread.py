@@ -174,7 +174,9 @@ class ThreadRequest:
         :return: The created thread
         """
         if message_id:
-            return await self.create_thread_from_message(channel_id, message_id, name, auto_archive_duration)
+            return await self.create_thread_from_message(
+                channel_id, message_id, name, auto_archive_duration
+            )
 
         payload = {
             "name": name,
@@ -200,7 +202,7 @@ class ThreadRequest:
         message_id: int,
         name: str,
         auto_archive_duration: Optional[int] = None,
-        reason: Optional[int] = None
+        reason: Optional[int] = None,
     ) -> dict:
         """
         From a given channel, create a Thread with a message to start with.

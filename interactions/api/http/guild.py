@@ -3,9 +3,9 @@ from urllib.parse import quote
 
 from ..models.channel import Channel
 from ..models.guild import Guild
-from ..models.role import Role
 from ..models.member import Member
 from ..models.misc import Snowflake
+from ..models.role import Role
 from .request import _Request
 from .route import Route
 
@@ -100,9 +100,7 @@ class GuildRequest:
         :param guild_id: The guild snowflake ID associated.
         :return: None
         """
-        await self._req.request(
-            Route("DELETE", f"/users/@me/guilds/{guild_id}", guild_id=guild_id)
-        )
+        await self._req.request(Route("DELETE", f"/users/@me/guilds/{guild_id}", guild_id=guild_id))
 
         self.cache[Guild].pop(Snowflake(guild_id))
 

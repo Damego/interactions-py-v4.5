@@ -1,8 +1,8 @@
-from .base import BaseProcessor
 from ...models import gw as events
 from ...models.guild import Guild
-from ...models.misc import Snowflake
 from ...models.member import Member
+from ...models.misc import Snowflake
+from .base import BaseProcessor
 
 
 class MemberProcessor(BaseProcessor):

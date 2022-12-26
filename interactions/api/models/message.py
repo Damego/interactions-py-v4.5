@@ -1381,4 +1381,3 @@ class Message(ClientSerializerMixin, IDMixin):
         )
 
         return self
-

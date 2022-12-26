@@ -1,10 +1,10 @@
-from .base import BaseProcessor
 from ...models import gw as events
+from ...models.emoji import Emoji
 from ...models.guild import Guild, Invite
+from ...models.message import Sticker
 from ...models.misc import Snowflake
 from ...models.role import Role
-from ...models.emoji import Emoji
-from ...models.message import Sticker
+from .base import BaseProcessor
 
 
 class GuildProcessor(BaseProcessor):

@@ -1,6 +1,6 @@
-from .base import BaseProcessor
 from ...models import gw as events
 from ...models.misc import Snowflake
+from .base import BaseProcessor
 
 
 class ScheduledEventProcessor(BaseProcessor):

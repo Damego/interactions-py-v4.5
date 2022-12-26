@@ -1,7 +1,7 @@
-from .base import BaseProcessor
 from ...models import gw as events
-from ...models.misc import Snowflake
 from ...models.message import Message
+from ...models.misc import Snowflake
+from .base import BaseProcessor
 
 
 class MessageProcessor(BaseProcessor):

@@ -38,9 +38,7 @@ class ChannelRequest:
 
         :param channel_id: Channel ID snowflake
         """
-        await self._req.request(
-            Route("DELETE", "/channels/{channel_id}", channel_id=channel_id)
-        )
+        await self._req.request(Route("DELETE", "/channels/{channel_id}", channel_id=channel_id))
 
         self.cache[Channel].pop(Snowflake(channel_id))
 
@@ -343,9 +341,7 @@ class ChannelRequest:
 
         tags.append(_tag)
 
-        res = await self.modify_channel(
-            channel_id, {"available_tags": tags}, reason=reason
-        )
+        res = await self.modify_channel(channel_id, {"available_tags": tags}, reason=reason)
 
         return [tag for tag in res["available_tags"] if tag["name"] == name][0]
 
@@ -396,9 +392,7 @@ class ChannelRequest:
         if emoji_name is not None:
             tag["emoji_name"] = emoji_name
 
-        res = await self.modify_channel(
-            channel_id, {"available_tags": tags}, reason=reason
-        )
+        res = await self.modify_channel(channel_id, {"available_tags": tags}, reason=reason)
 
         return [tag for tag in res["available_tags"] if tag["name"] == name][0]
 

@@ -2,9 +2,8 @@ from typing import TYPE_CHECKING, List, Optional
 
 from aiohttp import FormData
 
-from ..models.misc import File
 from ..models.message import Sticker
-from ..models.misc import Snowflake
+from ..models.misc import File, Snowflake
 from .request import _Request
 from .route import Route
 

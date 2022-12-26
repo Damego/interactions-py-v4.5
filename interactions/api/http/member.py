@@ -38,7 +38,7 @@ class MemberRequest:
 
         self.cache[Member].merge(
             Member(**res, _client=self, guild_id=Snowflake(guild_id)),
-            id=(Snowflake(guild_id), Snowflake(res["id"]))
+            id=(Snowflake(guild_id), Snowflake(res["id"])),
         )
 
         return res
@@ -63,7 +63,7 @@ class MemberRequest:
         [
             self.cache[Member].merge(
                 Member(**member, _client=self, guild_id=Snowflake(guild_id)),
-                id=(Snowflake(guild_id), Snowflake(res["id"]))
+                id=(Snowflake(guild_id), Snowflake(res["id"])),
             )
             for member in res
         ]
@@ -86,7 +86,7 @@ class MemberRequest:
         [
             self.cache[Member].merge(
                 Member(**member, _client=self, guild_id=Snowflake(guild_id)),
-                id=(Snowflake(guild_id), Snowflake(res["id"]))
+                id=(Snowflake(guild_id), Snowflake(res["id"])),
             )
             for member in res
         ]
@@ -161,7 +161,7 @@ class MemberRequest:
 
         self.cache[Member].merge(
             Member(**res, _client=self, guild_id=Snowflake(guild_id)),
-            id=(Snowflake(guild_id), Snowflake(res["id"]))
+            id=(Snowflake(guild_id), Snowflake(res["id"])),
         )
 
         return res
