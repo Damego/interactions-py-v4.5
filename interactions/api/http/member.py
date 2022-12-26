@@ -36,7 +36,10 @@ class MemberRequest:
             )
         )
 
-        self.cache[Member].merge(Member(**res, _client=self, guild_id=Snowflake(guild_id)))
+        self.cache[Member].merge(
+            Member(**res, _client=self, guild_id=Snowflake(guild_id)),
+            id=(Snowflake(guild_id), Snowflake(res["id"]))
+        )
 
         return res
 
@@ -57,8 +60,13 @@ class MemberRequest:
 
         res = await self._req.request(Route("GET", f"/guilds/{guild_id}/members"), params=payload)
 
-        [self.cache[Member].merge(Member(**member, _client=self, guild_id=Snowflake(guild_id))) for member in res]
-
+        [
+            self.cache[Member].merge(
+                Member(**member, _client=self, guild_id=Snowflake(guild_id)),
+                id=(Snowflake(guild_id), Snowflake(res["id"]))
+            )
+            for member in res
+        ]
         return res
 
     async def search_guild_members(self, guild_id: int, query: str, limit: int = 1) -> List[dict]:
@@ -75,7 +83,13 @@ class MemberRequest:
             params={"query": query, "limit": limit},
         )
 
-        [self.cache[Member].merge(Member(**member, _client=self, guild_id=Snowflake(guild_id))) for member in res]
+        [
+            self.cache[Member].merge(
+                Member(**member, _client=self, guild_id=Snowflake(guild_id)),
+                id=(Snowflake(guild_id), Snowflake(res["id"]))
+            )
+            for member in res
+        ]
 
         return res
 
@@ -137,10 +151,17 @@ class MemberRequest:
         :return: Modified member object.
         """
 
-        return await self._req.request(
+        res = await self._req.request(
             Route(
                 "PATCH", "/guilds/{guild_id}/members/{user_id}", guild_id=guild_id, user_id=user_id
             ),
             json=payload,
             reason=reason,
         )
+
+        self.cache[Member].merge(
+            Member(**res, _client=self, guild_id=Snowflake(guild_id)),
+            id=(Snowflake(guild_id), Snowflake(res["id"]))
+        )
+
+        return res
