@@ -43,6 +43,8 @@ class BaseProcessor:
             before = None
             cached_object = obj
 
+            self._cache[model].add(obj, id=id or obj.id)
+
         return before, cached_object
 
     def _delete_event(
