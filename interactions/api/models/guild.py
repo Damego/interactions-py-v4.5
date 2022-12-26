@@ -686,7 +686,9 @@ class Guild(ClientSerializerMixin, IDMixin):
             reason=reason,
         )
 
-        member = self.get_member()
+        member = self._client.cache[Member].get(Snowflake(_member_id))
+        if member:
+            member.roles.append(_role_id)
 
     async def remove_member_role(
         self,
@@ -715,6 +717,10 @@ class Guild(ClientSerializerMixin, IDMixin):
             role_id=_role_id,
             reason=reason,
         )
+
+        member = self._client.cache[Member].get(Snowflake(_member_id))
+        if member:
+            member.roles.remove(_role_id)
 
     async def create_role(
         self,
@@ -763,11 +769,7 @@ class Guild(ClientSerializerMixin, IDMixin):
             payload=payload,
         )
 
-        role = Role(**res, _client=self._client)
-
-        self._client.cache[Role].add(role)
-
-        return role
+        return self._client.cache[Role].get(Snowflake(res["id"]))
 
     async def get_member(
         self,
