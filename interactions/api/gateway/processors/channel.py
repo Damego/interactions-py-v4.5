@@ -7,16 +7,20 @@ from ...models.channel import Channel, Thread
 
 class ChannelProcessor(BaseProcessor):
     def channel_create(self, data: dict) -> tuple:
-        channel = Channel(**data)
-        self._cache[Channel].add(channel)
+        channel = self._create_event(Channel, data)
 
         guild = self._cache[Guild].get(channel.guild_id)
-        guild.channels.append(channel)
+        guild._channel_ids.add(channel.id)
 
         return (channel,)
 
     def channel_update(self, data: dict) -> tuple:
-        return self._update_event(Channel, data)
+        before, after = self._update_event(Channel, data)
+
+        guild = self._cache[Guild].get(after.guild_id)
+        guild._channel_ids.add(after.id)
+
+        return before, after
 
     def channel_delete(self, data: dict) -> tuple:
         channel = self._delete_event(Channel, id=Snowflake(data["id"]))
@@ -24,10 +28,7 @@ class ChannelProcessor(BaseProcessor):
             channel = Channel(**data)
 
         guild = self._cache[Guild].get(channel.guild_id)
-        for index, _channel in guild.channels:
-            if channel.id == _channel.id:
-                guild.channels.pop(index)
-                break
+        guild._channel_ids.remove(channel.id)
 
         return (channel,)
 
@@ -35,16 +36,20 @@ class ChannelProcessor(BaseProcessor):
         return (events.ChannelPins(**data),)
 
     def thread_create(self, data: dict) -> tuple:
-        thread = Thread(**data)
-        self._cache[Thread].add(thread)
+        thread = self._create_event(Thread, data)
 
         guild = self._cache[Guild].get(thread.guild_id)
-        guild.threads.append(thread)
+        guild._thread_ids.add(thread.id)
 
         return (thread,)
 
     def thread_update(self, data: dict) -> tuple:
-        return self._update_event(Thread, data)
+        before, after = self._update_event(Thread, data)
+
+        guild = self._cache[Guild].get(after.guild_id)
+        guild._thread_ids.add(after.id)
+
+        return before, after
 
     def thread_delete(self, data: dict) -> tuple:
         thread = self._delete_event(Thread, id=Snowflake(data["id"]))
@@ -52,10 +57,7 @@ class ChannelProcessor(BaseProcessor):
             thread = Thread(**data)
 
         guild = self._cache[Guild].get(thread.guild_id)
-        for index, _thread in guild.threads:
-            if thread.id == _thread.id:
-                guild.threads.pop(index)
-                break
+        guild._channel_ids.remove(thread.id)
 
         return (thread,)
 
