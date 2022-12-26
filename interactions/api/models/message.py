@@ -1374,20 +1374,11 @@ class Message(ClientSerializerMixin, IDMixin):
             for component in components.components:
                 component.disabled = True
 
-        res = await self._client.edit_message(
-                int(self.channel_id),
-                int(self.id),
-                payload={"components": [component._json for component in self.components]},
+        await self._client.edit_message(
+            int(self.channel_id),
+            int(self.id),
+            payload={"components": [component._json for component in self.components]},
         )
-
-        self.update(res)
-
-        # This is really confuses me.
-        # Like we edit this message object FOUR times
-        # 1. In this method set disabled attr to every component
-        # 2. Http methods edits it too.
-        # 3. self.update(res)
-        # 4. gateway event message_update
 
         return self
 
