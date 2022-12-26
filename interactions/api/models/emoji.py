@@ -107,6 +107,7 @@ class Emoji(ClientSerializerMixin):
         _guild_id = int(guild_id) if isinstance(guild_id, (int, Snowflake)) else int(guild_id.id)
 
         res = await client.get_all_emoji(guild_id=_guild_id)
+        # TODO: YET THIS
         return [cls(**emoji, _client=client) for emoji in res]
 
     async def delete(

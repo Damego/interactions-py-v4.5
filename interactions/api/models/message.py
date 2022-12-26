@@ -16,7 +16,7 @@ from ...utils.attrs_utils import (
 )
 from ...utils.missing import MISSING
 from ..error import LibraryException
-from .channel import Channel
+from .channel import Channel, Thread
 from .emoji import Emoji
 from .flags import MessageFlags
 from .member import Member
@@ -26,6 +26,7 @@ from .user import User
 
 if TYPE_CHECKING:
     from ..http import HTTPClient
+    from .guild import Guild
 
 __all__ = (
     "MessageType",
@@ -766,6 +767,9 @@ class Message(ClientSerializerMixin, IDMixin):
     position: Optional[int] = field(default=None, repr=False)
 
     def __attrs_post_init__(self):
+        if self.referenced_message is not None:
+            self.referenced_message = Message(**self.referenced_message, _client=self._client)
+
         if self.member and self.guild_id:
             self.member._extras["guild_id"] = self.guild_id
 
@@ -790,8 +794,21 @@ class Message(ClientSerializerMixin, IDMixin):
         """
         return self.id.timestamp
 
-        if self.referenced_message is not None:
-            self.referenced_message = Message(**self.referenced_message, _client=self._client)
+    @property
+    def guild(self) -> Optional["Guild"]:
+        if not self._client:
+            raise LibraryException(code=13)
+
+        from .guild import Guild
+
+        return self._client.cache[Guild].get(self.guild_id)
+
+    @property
+    def channel(self) -> Optional[Channel]:
+        if not self._client:
+            raise LibraryException(code=13)
+
+        return self._client.cache[Channel].get(self.channel_id)
 
     async def get_channel(self) -> Channel:
         """
@@ -803,8 +820,13 @@ class Message(ClientSerializerMixin, IDMixin):
         """
         if not self._client:
             raise LibraryException(code=13)
-        res = await self._client.get_channel(channel_id=int(self.channel_id))
-        return Channel(**res, _client=self._client)
+
+        if self.channel:
+            return self.channel
+
+        await self._client.get_channel(channel_id=int(self.channel_id))
+
+        return self._client.cache[Channel].get(self.channel_id)
 
     async def get_guild(self):
         """
@@ -816,10 +838,15 @@ class Message(ClientSerializerMixin, IDMixin):
         """
         if not self._client:
             raise LibraryException(code=13)
+
         from .guild import Guild
 
-        res = await self._client.get_guild(guild_id=int(self.guild_id))
-        return Guild(**res, _client=self._client)
+        if self.guild:
+            return self.guild
+
+        await self._client.get_guild(guild_id=int(self.guild_id))
+
+        return self._client.cache[Guild].get(self.guild_id)
 
     async def delete(self, reason: Optional[str] = None) -> None:
         """
@@ -831,6 +858,7 @@ class Message(ClientSerializerMixin, IDMixin):
         """
         if not self._client:
             raise LibraryException(code=13)
+
         await self._client.delete_message(
             message_id=int(self.id), channel_id=int(self.channel_id), reason=reason
         )
@@ -884,8 +912,10 @@ class Message(ClientSerializerMixin, IDMixin):
         """
         if not self._client:
             raise LibraryException(code=13)
+
         if self.flags == 64:
             raise LibraryException(message="You cannot edit a hidden message!", code=12)
+
         _flags = self.flags
         if suppress_embeds is not MISSING and suppress_embeds:
             _flags |= MessageFlags.SUPPRESS_EMBEDS
@@ -1004,6 +1034,7 @@ class Message(ClientSerializerMixin, IDMixin):
         """
         if not self._client:
             raise LibraryException(code=13)
+
         from ...client.models.component import _build_components
 
         _content: str = "" if content is MISSING else content
@@ -1057,11 +1088,7 @@ class Message(ClientSerializerMixin, IDMixin):
             channel_id=int(self.channel_id), payload=payload, files=files
         )
 
-        author = {"id": None, "username": None, "discriminator": None}
-        author.update(res["author"])
-        res["author"] = author
-
-        return Message(**res, _client=self._client)
+        return self._client.cache[Message].get(Snowflake(res["id"]))
 
     async def pin(self) -> None:
         """
@@ -1071,6 +1098,7 @@ class Message(ClientSerializerMixin, IDMixin):
         """
         if not self._client:
             raise LibraryException(code=13)
+
         await self._client.pin_message(channel_id=int(self.channel_id), message_id=int(self.id))
 
     async def unpin(self) -> None:
@@ -1081,6 +1109,7 @@ class Message(ClientSerializerMixin, IDMixin):
         """
         if not self._client:
             raise LibraryException(code=13)
+
         await self._client.unpin_message(channel_id=int(self.channel_id), message_id=int(self.id))
 
     async def publish(self) -> "Message":
@@ -1105,7 +1134,7 @@ class Message(ClientSerializerMixin, IDMixin):
         auto_archive_duration: Optional[int] = MISSING,
         invitable: Optional[bool] = MISSING,
         reason: Optional[str] = None,
-    ) -> Channel:
+    ) -> Thread:
         """
         .. versionadded:: 4.1.0
 
@@ -1120,8 +1149,10 @@ class Message(ClientSerializerMixin, IDMixin):
         """
         if not self._client:
             raise LibraryException(code=13)
+
         _auto_archive_duration = None if auto_archive_duration is MISSING else auto_archive_duration
         _invitable = None if invitable is MISSING else invitable
+
         res = await self._client.create_thread(
             channel_id=int(self.channel_id),
             message_id=int(self.id),
@@ -1130,7 +1161,7 @@ class Message(ClientSerializerMixin, IDMixin):
             invitable=_invitable,
             auto_archive_duration=_auto_archive_duration,
         )
-        return Channel(**res, _client=self._client)
+        return self._client.cache[Thread].get(Snowflake(res["id"]))
 
     async def create_reaction(
         self,
@@ -1307,6 +1338,8 @@ class Message(ClientSerializerMixin, IDMixin):
             channel_id=_channel_id,
             message_id=_message_id,
         )
+        # TODO: YET THIS
+
         return cls(**_message, _client=client)
 
     @property
@@ -1341,11 +1374,20 @@ class Message(ClientSerializerMixin, IDMixin):
             for component in components.components:
                 component.disabled = True
 
-        return Message(
-            **await self._client.edit_message(
+        res = await self._client.edit_message(
                 int(self.channel_id),
                 int(self.id),
                 payload={"components": [component._json for component in self.components]},
-            ),
-            _client=self._client,
         )
+
+        self.update(res)
+
+        # This is really confuses me.
+        # Like we edit this message object FOUR times
+        # 1. In this method set disabled attr to every component
+        # 2. Http methods edits it too.
+        # 3. self.update(res)
+        # 4. gateway event message_update
+
+        return self
+
