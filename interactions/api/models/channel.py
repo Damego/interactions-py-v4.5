@@ -52,7 +52,7 @@ __all__ = (
     "ThreadMetadata",
     "AsyncHistoryIterator",
     "AsyncTypingContextManager",
-    "Tags",
+    "ForumTag",
 )
 
 
@@ -222,7 +222,7 @@ class AsyncHistoryIterator(DiscordPaginationIterator):
 
         self.object_count += limit
 
-        self.objects.extend([Message(**msg, _client=self._client) for msg in msgs])
+        self.objects.extend([self._client.cache[Message].get(Snowflake(msg["id"])) for msg in msgs])
 
     async def __anext__(self) -> "Message":
         try:
@@ -298,7 +298,7 @@ class AsyncTypingContextManager(BaseAsyncContextManager):
 
 
 @define()
-class Tags(ClientSerializerMixin):
+class ForumTag(ClientSerializerMixin):
     """
     .. versionadded:: 4.3.2
 
@@ -353,15 +353,15 @@ class Tags(ClientSerializerMixin):
 
         _channel_id = int(channel_id.id) if isinstance(channel_id, Channel) else int(channel_id)
 
-        return await self._client.delete_tag(_channel_id, int(self.id))
+        await self._client.delete_tag(_channel_id, int(self.id))
 
     async def edit(
         self,
         channel_id: Union[int, str, Snowflake, "Channel"],  # discord, why :hollow:
-        name: str,
+        name: Optional[str] = MISSING,
         emoji_name: Optional[str] = MISSING,
         emoji_id: Optional[int] = MISSING,
-    ) -> "Tags":
+    ) -> "ForumTag":
         """
         Edits this tag
 
@@ -374,7 +374,7 @@ class Tags(ClientSerializerMixin):
         :param Optional[int] emoji_id: The ID of the emoji to use for the tag
         :param Optional[int] emoji_name: The name of the emoji to use for the tag
         :return: The modified tag
-        :rtype: Tags
+        :rtype: ForumTag
         """
 
         if isinstance(channel_id, Channel) and channel_id.type != ChannelType.GUILD_FORUM:
@@ -385,13 +385,15 @@ class Tags(ClientSerializerMixin):
 
         _channel_id = int(channel_id.id) if isinstance(channel_id, Channel) else int(channel_id)
 
-        payload = {"name": name}
-
-        if emoji_id is not MISSING and emoji_id and emoji_name and emoji_name is not MISSING:
+        if emoji_id is not MISSING and emoji_name is not MISSING:
             raise LibraryException(
                 code=12, message="emoji_id and emoji_name are mutually exclusive"
             )
 
+        payload: dict = {}
+
+        if name is not MISSING:
+            payload["name"] = name
         if emoji_id is not MISSING:
             payload["emoji_id"] = emoji_id
         if emoji_name is not MISSING:
@@ -399,7 +401,9 @@ class Tags(ClientSerializerMixin):
 
         data = await self._client.edit_tag(_channel_id, int(self.id), **payload)
 
-        return Tags(**data)
+        self.update(data)
+
+        return self
 
 
 @define()
@@ -437,7 +441,7 @@ class Channel(ClientSerializerMixin, IDMixin):
     :ivar Optional[int] flags: The flags of the channel.
     :ivar Optional[int] total_message_sent: Number of messages ever sent in a thread.
     :ivar Optional[int] default_thread_slowmode_delay: The default slowmode delay in seconds for threads, if this channel is a forum.
-    :ivar Optional[List[Tags]] available_tags: Tags in a forum channel, if any.
+    :ivar Optional[List[ForumTag]] available_tags: ForumTag in a forum channel, if any.
     :ivar Optional[List[Snowflake]] applied_tags: The IDs of tags that have been applied to a thread, if any.
     :ivar Optional[Emoji] default_reaction_emoji: Default reaction emoji for threads created in a forum, if any.
     """
@@ -488,8 +492,8 @@ class Channel(ClientSerializerMixin, IDMixin):
     flags: Optional[int] = field(default=None, repr=False)
     total_message_sent: Optional[int] = field(default=None, repr=False)
     default_thread_slowmode_delay: Optional[int] = field(default=None, repr=False)
-    available_tags: Optional[List[Tags]] = field(
-        converter=convert_list(Tags), default=None, add_client=True
+    available_tags: Optional[List[ForumTag]] = field(
+        converter=convert_list(ForumTag), default=None, add_client=True
     )
     applied_tags: Optional[List[Snowflake]] = field(converter=convert_list(Snowflake), default=None)
     default_reaction_emoji: Optional[Emoji] = field(converter=Emoji, default=None)
@@ -732,12 +736,8 @@ class Channel(ClientSerializerMixin, IDMixin):
             channel_id=int(self.id), payload=payload, files=files
         )
 
-        # dumb hack, discord doesn't send the full author data
-        author = {"id": None, "username": None, "discriminator": None}
-        author.update(res["author"])
-        res["author"] = author
+        return self._client.cache[Message].get(Snowflake(res["id"]))
 
-        return Message(**res, _client=self._client)
 
     async def delete(self) -> None:
         """
@@ -747,7 +747,10 @@ class Channel(ClientSerializerMixin, IDMixin):
         """
         if not self._client:
             raise LibraryException(code=13)
+
         await self._client.delete_channel(channel_id=int(self.id))
+
+        self._client.cache[Channel].pop(self.id)
 
     async def modify(
         self,
@@ -801,47 +804,32 @@ class Channel(ClientSerializerMixin, IDMixin):
         """
         if not self._client:
             raise LibraryException(code=13)
-        _name = self.name if name is MISSING else name
-        _topic = self.topic if topic is MISSING else topic
-        _bitrate = self.bitrate if bitrate is MISSING else bitrate
-        _user_limit = self.user_limit if user_limit is MISSING else user_limit
-        _rate_limit_per_user = (
-            self.rate_limit_per_user if rate_limit_per_user is MISSING else rate_limit_per_user
-        )
-        _position = self.position if position is MISSING else position
-        _parent_id = (
-            (int(self.parent_id) if self.parent_id else None)
-            if parent_id is MISSING
-            else int(parent_id)
-        )
-        _nsfw = self.nsfw if nsfw is MISSING else nsfw
-        _permission_overwrites = (
-            [overwrite._json for overwrite in permission_overwrites]
-            if permission_overwrites is not MISSING
-            else [overwrite._json for overwrite in self.permission_overwrites]
-            if self.permission_overwrites
-            else None
-        )
-        _type = self.type
-
-        payload = dict(
-            name=_name,
-            type=_type,
-            topic=_topic,
-            bitrate=_bitrate,
-            user_limit=_user_limit,
-            rate_limit_per_user=_rate_limit_per_user,
-            position=_position,
-            parent_id=_parent_id,
-            nsfw=_nsfw,
-            permission_overwrites=_permission_overwrites,
-        )
 
         if (
             archived is not MISSING or auto_archive_duration is not MISSING or locked is not MISSING
         ) and not self.thread_metadata:
             raise LibraryException(message="The specified channel is not a Thread!", code=12)
 
+        payload: dict = {}
+
+        if name is not MISSING:
+            payload["name"] = name
+        if topic is not MISSING:
+            payload["topic"] = topic
+        if bitrate is not MISSING:
+            payload["bitrate"] = bitrate
+        if user_limit is not MISSING:
+            payload["user_limit"] = user_limit
+        if rate_limit_per_user is not MISSING:
+            payload["rate_limit_per_user"] = rate_limit_per_user
+        if position is not MISSING:
+            payload["position"] = position
+        if parent_id is not MISSING:
+            payload["parent_id"] = int(parent_id)
+        if nsfw is not MISSING:
+            payload["nsfw"] = nsfw
+        if permission_overwrites is not MISSING:
+            payload["permission_overwrites"] = [overwrite._json for overwrite in permission_overwrites]
         if archived is not MISSING:
             payload["archived"] = archived
         if auto_archive_duration is not MISSING:
@@ -1196,15 +1184,20 @@ class Channel(ClientSerializerMixin, IDMixin):
         """
         if not self._client:
             raise LibraryException(code=13)
+
         from .message import Message
 
         res = await self._client.get_pinned_messages(int(self.id))
-        return [Message(**message, _client=self._client) for message in res]
+        messages = [Message(**message, _client=self._client) for message in res]
+
+        [self._client.cache[Message].add(message) for message in messages]
+
+        return messages
 
     async def get_message(
         self,
         message_id: Union[int, Snowflake],
-    ) -> "Message":
+    ) -> Optional["Message"]:
         """
         .. versionadded:: 4.1.0
 
@@ -1218,9 +1211,13 @@ class Channel(ClientSerializerMixin, IDMixin):
             channel_id=int(self.id),
             message_id=int(message_id),
         )
+
+        if res is None:
+            return
+
         from .message import Message
 
-        return Message(**res, _client=self._client)
+        return self._client.cache[Message].get(Snowflake(message_id))
 
     async def purge(
         self,
@@ -1275,7 +1272,7 @@ class Channel(ClientSerializerMixin, IDMixin):
             nonlocal _before, _all, amount, check, reason
             while amount > 0:
                 messages = [
-                    Message(**res)
+                    self._client.cache[Message].get(Snowflake(res["id"]))
                     for res in await self._client.get_channel_messages(
                         channel_id=int(self.id),
                         limit=min(amount, 100),
@@ -1324,7 +1321,7 @@ class Channel(ClientSerializerMixin, IDMixin):
             while amount > 100:
 
                 messages = [
-                    Message(**res)
+                    self._client.cache[Message].get(Snowflake(res["id"]))
                     for res in await self._client.get_channel_messages(
                         channel_id=int(self.id),
                         limit=100,
@@ -1379,7 +1376,7 @@ class Channel(ClientSerializerMixin, IDMixin):
 
             while amount > 1:
                 messages = [
-                    Message(**res)
+                    self._client.cache[Message].get(Snowflake(res["id"]))
                     for res in await self._client.get_channel_messages(
                         channel_id=int(self.id),
                         limit=amount,
@@ -1431,7 +1428,7 @@ class Channel(ClientSerializerMixin, IDMixin):
                     return _all
             while amount == 1:
                 messages = [
-                    Message(**res)
+                    self._client.cache[Message].get(Snowflake(res["id"]))
                     for res in await self._client.get_channel_messages(
                         channel_id=int(self.id),
                         limit=amount,
@@ -1530,7 +1527,7 @@ class Channel(ClientSerializerMixin, IDMixin):
             reason=reason,
         )
 
-        return Channel(**res, _client=self._client)
+        return self._client.cache[Thread].get(Snowflake(res["id"]))
 
     @property
     def url(self) -> str:
@@ -1614,68 +1611,6 @@ class Channel(ClientSerializerMixin, IDMixin):
 
         return Invite(**res, _client=self._client)
 
-    async def get_history(self, limit: int = 100) -> Optional[List["Message"]]:
-        """
-        .. versionadded:: 4.2.0
-
-        .. deprecated:: 4.3.2
-            Use the :meth:`.history` method instead
-
-        Gets messages from the channel's history.
-
-        :param int limit: The amount of messages to get. Default 100
-        :return: A list of messages
-        :rtype: List[Message]
-        """
-
-        warn(
-            "This method has been deprecated in favour of the 'history' method.", DeprecationWarning
-        )
-
-        if not self._client:
-            raise LibraryException(code=13)
-
-        from .message import Message
-
-        _messages: List[Message] = []
-        _before: Optional[int] = None
-        while limit > 100:
-            _msgs = [
-                Message(**res, _client=self._client)
-                for res in await self._client.get_channel_messages(
-                    channel_id=int(self.id),
-                    limit=100,
-                    before=_before,
-                )
-            ]
-            limit -= 100
-            if not _msgs:
-                return _messages
-            _before = int(_msgs[-1].id)
-
-            for msg in _msgs:
-                if msg in _messages:
-                    return _messages
-                else:
-                    _messages.append(msg)
-
-        if limit > 0:
-            _msgs = [
-                Message(**res, _client=self._client)
-                for res in await self._client.get_channel_messages(
-                    channel_id=int(self.id), limit=limit, before=_before
-                )
-            ]
-            if not _msgs:
-                return _messages
-            for msg in _msgs:
-                if msg in _messages:
-                    return _messages
-                else:
-                    _messages.append(msg)
-
-        return _messages
-
     async def get_webhooks(self) -> List[Webhook]:
         """
         .. versionadded:: 4.3.0
@@ -1737,7 +1672,7 @@ class Channel(ClientSerializerMixin, IDMixin):
         name: str,
         emoji_id: Optional[int] = MISSING,
         emoji_name: Optional[str] = MISSING,
-    ) -> Tags:
+    ) -> ForumTag:
         """
         .. versionadded:: 4.3.2
 
@@ -1751,14 +1686,14 @@ class Channel(ClientSerializerMixin, IDMixin):
         :param Optional[int] emoji_id: The ID of the emoji to use for the tag
         :param Optional[str] emoji_name: The name of the emoji to use for the tag
         :return: The create tag object
-        :rtype: Tags
+        :rtype: ForumTag
         """
 
         if not self._client:
             raise LibraryException(code=13)
 
         if self.type != ChannelType.GUILD_FORUM:
-            raise LibraryException(code=14, message="Tags can only be created in forum channels!")
+            raise LibraryException(code=14, message="ForumTag can only be created in forum channels!")
 
         if emoji_id is not MISSING and emoji_id and emoji_name and emoji_name is not MISSING:
             raise LibraryException(
@@ -1774,15 +1709,15 @@ class Channel(ClientSerializerMixin, IDMixin):
 
         data = await self._client.create_tag(int(self.id), **payload)
 
-        return Tags(**data)
+        return ForumTag(**data)
 
     async def edit_tag(
         self,
-        tag_id: Union[int, str, Snowflake, Tags],  # discord, why :hollow:
-        name: str,
+        tag_id: Union[int, str, Snowflake, ForumTag],  # discord, why :hollow:
+        name: Optional[str] = MISSING,
         emoji_name: Optional[str] = MISSING,
         emoji_id: Optional[int] = MISSING,
-    ) -> "Tags":
+    ) -> ForumTag:
         """
         .. versionadded:: 4.3.2
 
@@ -1792,25 +1727,30 @@ class Channel(ClientSerializerMixin, IDMixin):
             Can either have an emoji_id or an emoji_name, but not both.
             emoji_id is meant for custom emojis, emoji_name is meant for unicode emojis.
 
-        :param Union[int, str, Snowflake, Tags] tag_id: The ID of the tag to edit
+        :param Union[int, str, Snowflake, ForumTag] tag_id: The ID of the tag to edit
         :param str name: The new name of the tag
         :param Optional[int] emoji_id: The ID of the emoji to use for the tag
         :param Optional[int] emoji_name: The name of the emoji to use for the tag
         :return: The modified tag
-        :rtype: Tags
+        :rtype: ForumTag
         """
-        _tag_id = int(tag_id.id) if isinstance(tag_id, Tags) else int(tag_id)
+        if not self._client:
+            raise LibraryException(code=13)
 
-        if emoji_id is not MISSING and emoji_id and emoji_name and emoji_name is not MISSING:
+        if emoji_id is not MISSING and emoji_name is not MISSING:
             raise LibraryException(
                 code=12, message="emoji_id and emoji_name are mutually exclusive"
             )
 
         if self.type != ChannelType.GUILD_FORUM:
-            raise LibraryException(code=14, message="Tags can only be created in forum channels!")
+            raise LibraryException(code=14, message="ForumTag can only be created in forum channels!")
 
-        payload = {"name": name}
+        _tag_id = int(tag_id.id if isinstance(tag_id, ForumTag) else tag_id)
 
+        payload = {}
+
+        if name is not MISSING:
+            payload["name"] = name
         if emoji_id is not MISSING:
             payload["emoji_id"] = emoji_id
         if emoji_name is not MISSING:
@@ -1818,22 +1758,25 @@ class Channel(ClientSerializerMixin, IDMixin):
 
         data = await self._client.edit_tag(int(self.id), _tag_id, **payload)
 
-        return Tags(**data)
+        return ForumTag(**data)
 
     async def delete_tag(
-        self, tag_id: Union[int, str, Snowflake, Tags]  # discord, why :hollow:
+        self, tag_id: Union[int, str, Snowflake, ForumTag]  # discord, why :hollow:
     ) -> None:
         """
         .. versionadded:: 4.3.2
 
         Deletes a tag
 
-        :param Union[int, str, Snowflake, Tags] tag_id: The ID of the Tag
+        :param Union[int, str, Snowflake, ForumTag] tag_id: The ID of the Tag
         """
-        if self.type != ChannelType.GUILD_FORUM:
-            raise LibraryException(code=14, message="Tags can only be created in forum channels!")
+        if not self._client:
+            raise LibraryException(code=13)
 
-        _tag_id = int(tag_id.id) if isinstance(tag_id, Tags) else int(tag_id)
+        if self.type != ChannelType.GUILD_FORUM:
+            raise LibraryException(code=14, message="ForumTag can only be created in forum channels!")
+
+        _tag_id = int(tag_id.id) if isinstance(tag_id, ForumTag) else int(tag_id)
 
         return await self._client.delete_tag(int(self.id), _tag_id)
 
@@ -1844,11 +1787,11 @@ class Channel(ClientSerializerMixin, IDMixin):
             dict, "Message", str, "Attachment", List["Attachment"]
         ],  # overkill but why not
         auto_archive_duration: Optional[int] = MISSING,
-        applied_tags: Union[List[str], List[int], List[Tags], int, str, Tags] = MISSING,
+        applied_tags: Union[List[str], List[int], List[ForumTag], int, str, ForumTag] = MISSING,
         files: Optional[List[File]] = MISSING,
         rate_limit_per_user: Optional[int] = MISSING,
         reason: Optional[str] = None,
-    ) -> "Channel":  # sourcery skip: low-code-quality
+    ) -> "Thread":  # sourcery skip: low-code-quality
         """
         .. versionadded:: 4.3.2
 
@@ -1857,7 +1800,7 @@ class Channel(ClientSerializerMixin, IDMixin):
         :param str name: The name of the thread
         :param Optional[int] auto_archive_duration: duration in minutes to automatically archive the thread after recent activity, can be set to: 60, 1440, 4320, 10080
         :param Union[dict, Message, str, Attachment, List[Attachment]] content: The content to send as first message.
-        :param Union[List[str], List[int], List[Tags], int, str, Tags] applied_tags: Tags to give to the created thread
+        :param Union[List[str], List[int], List[ForumTag], int, str, ForumTag] applied_tags: ForumTag to give to the created thread
         :param Optional[List[File]] files: An optional list of files to send attached to the message.
         :param Optional[int] rate_limit_per_user: Seconds a user has to wait before sending another message (0 to 21600), if given.
         :param Optional[str] reason: An optional reason for the audit log
@@ -1936,11 +1879,8 @@ class Channel(ClientSerializerMixin, IDMixin):
             for attach in content:
                 if attach.id:
                     _content["attachments"].append(attach._json)
-
                 else:
-
                     _data = await attach.download()
-
                     __files.append(File(attach.filename, _data))
 
             if not __files or __files is MISSING:
@@ -1963,12 +1903,12 @@ class Channel(ClientSerializerMixin, IDMixin):
             _tags = []
             if isinstance(applied_tags, list):
                 for tag in applied_tags:
-                    if isinstance(tag, Tags):
+                    if isinstance(tag, ForumTag):
                         _tags.append(str(tag.id))
                     else:
                         _tags.append(str(tag))
 
-            elif isinstance(applied_tags, Tags):
+            elif isinstance(applied_tags, ForumTag):
                 _tags.append(str(applied_tags.id))
             else:
                 _tags.append(str(applied_tags))
@@ -1979,7 +1919,7 @@ class Channel(ClientSerializerMixin, IDMixin):
 
         data = await self._client.create_thread_in_forum(int(self.id), **_top_payload)
 
-        return Channel(**data, _client=self._client)
+        return Thread(**data, _client=self._client)
 
     async def get_permissions_for(self, member: "Member") -> Permissions:
         """

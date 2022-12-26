@@ -103,8 +103,13 @@ class MessageRequest:
             json=payload,
             data=data,
         )
-        if request.get("id"):
-            self.cache[Message].add(Message(**request, _client=self))
+
+        # dumb hack, discord doesn't send the full author data
+        author = {"id": None, "username": None, "discriminator": None}
+        author.update(request["author"])
+        request["author"] = author
+
+        self.cache[Message].add(Message(**request, _client=self))
 
         return request
 
@@ -118,7 +123,8 @@ class MessageRequest:
         """
         res = await self._req.request(Route("GET", f"/channels/{channel_id}/messages/{message_id}"))
 
-        self.cache[Message].merge(Message(**res, _client=self))
+        if res is not None:
+            self.cache[Message].merge(Message(**res, _client=self))
 
         return res
 

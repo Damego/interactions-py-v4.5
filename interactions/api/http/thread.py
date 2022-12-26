@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 from aiohttp import MultipartWriter
 
 from ...utils.missing import MISSING
-from ..models.channel import Channel
+from ..models.channel import Thread
 from ..models.misc import File
 from .request import _Request
 from .route import Route
@@ -183,7 +183,7 @@ class ThreadRequest:
                 reason=reason,
             )
             if request.get("id"):
-                self.cache[Channel].add(Channel(**request))
+                self.cache[Thread].add(Thread(**request, _client=self))
                 return request
 
         payload["type"] = thread_type
@@ -192,7 +192,7 @@ class ThreadRequest:
             Route("POST", f"/channels/{channel_id}/threads"), json=payload, reason=reason
         )
         if request.get("id"):
-            self.cache[Channel].add(Channel(**request))
+            self.cache[Thread].add(Thread(**request, _client=self))
 
         return request
 

@@ -65,32 +65,24 @@ class ChannelRequest:
         """
         params: Dict[str, Union[int, str]] = {"limit": limit}
 
-        params_used = 0
-
-        if before:
-            params_used += 1
-            params["before"] = before
-        if after:
-            params_used += 1
-            params["after"] = after
-        if around:
-            params_used += 1
-            params["around"] = around
-
-        if params_used > 1:
+        if before and after and around:
             raise LibraryException(
                 message="`before`, `after` and `around` are mutually exclusive. Please pass only one of them.",
                 code=12,
             )
 
+        if before:
+            params["before"] = before
+        if after:
+            params["after"] = after
+        if around:
+            params["around"] = around
+
         request = await self._req.request(
             Route("GET", f"/channels/{channel_id}/messages"), params=params
         )
 
-        if isinstance(request, list):
-            for message in request:
-                if message.get("id"):
-                    self.cache[Message].merge(Message(**message, _client=self))
+        [self.cache[Message].merge(Message(**message, _client=self)) for message in request]
 
         return request
 
@@ -339,27 +331,27 @@ class ChannelRequest:
         # This *assumes* cache is up-to-date.
 
         _channel = self.cache[Channel].get(Snowflake(channel_id))
-        _tags = [_._json for _ in _channel.available_tags]  # list of tags in dict form
+        tags = [tag._json for tag in _channel.available_tags]  # list of tags in dict form
 
-        _dct = {"name": name, "moderated": moderated}
+        _tag = {"name": name, "moderated": moderated}
         if emoji_id:
-            _dct["emoji_id"] = emoji_id
+            _tag["emoji_id"] = emoji_id
         if emoji_name:
-            _dct["emoji_name"] = emoji_name
+            _tag["emoji_name"] = emoji_name
 
-        _tags.append(_dct)
+        tags.append(_tag)
 
-        updated_channel = await self.modify_channel(
-            channel_id, {"available_tags": _tags}, reason=reason
+        res = await self.modify_channel(
+            channel_id, {"available_tags": tags}, reason=reason
         )
-        _channel_obj = Channel(**updated_channel, _client=self)
-        return _channel_obj.available_tags[-1]._json
+
+        return [tag for tag in res["available_tags"] if tag["name"] == name][0]
 
     async def edit_tag(
         self,
         channel_id: int,
         tag_id: int,
-        name: str,
+        name: Optional[str] = None,
         moderated: Optional[bool] = None,
         emoji_id: Optional[int] = None,
         emoji_name: Optional[str] = None,
@@ -387,31 +379,26 @@ class ChannelRequest:
 
         # This *assumes* cache is up-to-date.
 
-        _channel = self.cache[Channel].get(Snowflake(channel_id))
-        _tags = [_._json for _ in _channel.available_tags]  # list of tags in dict form
+        channel = self.cache[Channel].get(Snowflake(channel_id))
+        tags = [tag._json for tag in channel.available_tags]  # list of tags in dict form
 
-        _old_tag = [tag for tag in _tags if tag["id"] == tag_id][0]
+        _tag_id = str(tag_id)
+        tag = [_tag for _tag in tags if _tag["id"] == _tag_id][0]
 
-        _tags.remove(_old_tag)
+        if name is not None:
+            tag["name"] = name
+        if moderated is not None:
+            tag["moderated"] = moderated
+        if emoji_id is not None:
+            tag["emoji_id"] = emoji_id
+        if emoji_name is not None:
+            tag["emoji_name"] = emoji_name
 
-        _dct = {"name": name, "tag_id": tag_id}
-        if moderated:
-            _dct["moderated"] = moderated
-        if emoji_id:
-            _dct["emoji_id"] = emoji_id
-        if emoji_name:
-            _dct["emoji_name"] = emoji_name
-
-        _tags.append(_dct)
-
-        updated_channel = await self.modify_channel(
-            channel_id, {"available_tags": _tags}, reason=reason
+        res = await self.modify_channel(
+            channel_id, {"available_tags": tags}, reason=reason
         )
-        _channel_obj = Channel(**updated_channel, _client=self)
 
-        self.cache[Channel].merge(_channel_obj)
-
-        return [tag for tag in _channel_obj.available_tags if tag.name == name][0]
+        return [tag for tag in res["available_tags"] if tag["name"] == name][0]
 
     async def delete_tag(self, channel_id: int, tag_id: int, reason: Optional[str] = None) -> None:
         """
@@ -421,13 +408,14 @@ class ChannelRequest:
         :param tag_id: The ID of the tag to delete
         :param reason: The reason for deleting the tag, if any.
         """
-        _channel = self.cache[Channel].get(Snowflake(channel_id))
-        _tags = [_._json for _ in _channel.available_tags]
+        channel = self.cache[Channel].get(Snowflake(channel_id))
+        tags = [_._json for _ in channel.available_tags]
 
-        _old_tag = [tag for tag in _tags if tag["id"] == Snowflake(tag_id)][0]
+        old_tag = [tag for tag in tags if tag["id"] == Snowflake(tag_id)][0]
+        tags.remove(old_tag)
 
-        _tags.remove(_old_tag)
+        await self.modify_channel(channel_id, {"available_tags": tags}, reason=reason)
 
-        request = await self.modify_channel(channel_id, {"available_tags": _tags}, reason=reason)
-
-        self.cache[Channel].merge(Channel(**request, _client=self))
+        for index, tag in enumerate(channel.available_tags):
+            if tag.id == tag_id:
+                channel.available_tags.pop(index)
