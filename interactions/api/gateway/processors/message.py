@@ -6,16 +6,13 @@ from ...models.message import Message
 
 class MessageProcessor(BaseProcessor):
     def message_create(self, data: dict) -> tuple:
-        message = Message(**data)
-        self._cache[Message].add(message)
-
-        return (message,)
+        return self._create_event(Message, data)
 
     def message_update(self, data: dict) -> tuple:
         return self._update_event(Message, data)
 
     def message_delete(self, data: dict) -> tuple:
-        message = self._cache[Message].pop(Snowflake(data["id"]))
+        message = self._delete_event(Message, id=Snowflake(data["id"]))
         if message is None:
             message = Message(**data)
 
