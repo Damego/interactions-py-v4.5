@@ -3,6 +3,8 @@ from ...models import gw as events
 from ...models.guild import Guild, Invite
 from ...models.misc import Snowflake
 from ...models.role import Role
+from ...models.emoji import Emoji
+from ...models.message import Sticker
 
 
 class GuildProcessor(BaseProcessor):
@@ -27,26 +29,22 @@ class GuildProcessor(BaseProcessor):
         return self.guild_ban_add(data)
 
     def guild_emojis_update(self, data: dict) -> tuple:
-        # TODO: emojis not stores in the cache
         guild_emojis = events.GuildEmojis(**data)
 
-        # guild_emojis.emojis contains all emojis of the guild
-
         guild = self._cache[Guild].get(guild_emojis.guild_id)
-        guild.emojis.clear()
-        guild.emojis.extend(guild_emojis.emojis)
+
+        [guild._emoji_ids.add(Snowflake(emoji.id)) for emoji in guild_emojis.emojis]
+        [self._cache[Emoji].merge(emoji) for emoji in guild_emojis.emojis]
 
         return (guild_emojis,)
 
     def guild_stickers_update(self, data: dict) -> tuple:
-        # TODO: stickers not stores in the cache
         guild_stickers = events.GuildStickers(**data)
 
-        # guild_stickers.stickers contains all stickers of the guild
-
         guild = self._cache[Guild].get(guild_stickers.guild_id)
-        guild.stickers.clear()
-        guild.stickers.extend(guild_stickers.stickers)
+
+        [guild._sticker_ids.add(Snowflake(sticker.id)) for sticker in guild_stickers.stickers]
+        [self._cache[Sticker].merge(sticker) for sticker in guild_stickers.stickers]
 
         return (guild_stickers,)
 
