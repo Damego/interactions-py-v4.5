@@ -407,7 +407,6 @@ class Guild(ClientSerializerMixin, IDMixin):
     verification_level: int = field(default=0)
     default_message_notifications: int = field(default=0)
     explicit_content_filter: int = field(default=0)
-    emojis: List[Emoji] = field(converter=convert_list(Emoji), factory=list, add_client=True)
     mfa_level: int = field(default=0)
     application_id: Optional[Snowflake] = field(converter=Snowflake, default=None)
     system_channel_id: Optional[Snowflake] = field(converter=Snowflake, default=None)
@@ -439,7 +438,6 @@ class Guild(ClientSerializerMixin, IDMixin):
     stage_instances: Optional[List[StageInstance]] = field(
         converter=convert_list(StageInstance), default=None
     )
-    stickers: Optional[List[Sticker]] = field(converter=convert_list(Sticker), default=None)
     features: List[str] = field()
     premium_progress_bar_enabled: Optional[bool] = field(default=None)
 
@@ -447,12 +445,42 @@ class Guild(ClientSerializerMixin, IDMixin):
     _role_ids: Set[Snowflake] = field(factory=list)
     _channel_ids: Set[Snowflake] = field(factory=list)
     _thread_ids: Set[Snowflake] = field(factory=list)
+    _emoji_ids: Set[Snowflake] = field(factory=list)
+    _sticker_ids: Set[Snowflake] = field(factory=list)
 
     def __attrs_post_init__(self):
+        if not self._client:
+            return
+
+        cache = self._client.cache
+        cache[Member].update(
+            {
+                (self.id, Snowflake(member["id"])): Member(member, _client=self._client)
+                for member in self._extras["members"]
+            }
+        )
+        cache[Role].update(
+            {Snowflake(role["id"]): Role(role, _client=self._client) for role in self._extras["roles"]}
+        )
+        cache[Channel].update(
+            {Snowflake(channel["id"]): Channel(channel, _client=self._client) for channel in self._extras["channels"]}
+        )
+        cache[Thread].update(
+            {Snowflake(thread["id"]): Thread(thread, _client=self._client) for thread in self._extras["threads"]}
+        )
+        cache[Emoji].update(
+            {Snowflake(emoji["id"]): Emoji(emoji, _client=self._client) for emoji in self._extras["emojis"]}
+        )
+        cache[Sticker].update(
+            {Snowflake(sticker["id"]): Sticker(sticker, _client=self._client) for sticker in self._extras["stickers"]}
+        )
+
         self._member_ids = {Snowflake(member["id"]) for member in self._extras["members"]}
         self._role_ids = {Snowflake(role["id"]) for role in self._extras["roles"]}
         self._channel_ids = {Snowflake(channel["id"]) for channel in self._extras["channels"]}
         self._thread_ids = {Snowflake(thread["id"]) for thread in self._extras["threads"]}
+        self._emoji_ids = {Snowflake(emoji["id"]) for emoji in self._extras["emojis"]}
+        self._sticker_ids = {Snowflake(sticker["id"]) for sticker in self._extras["stickers"]}
 
     @property
     def members(self) -> List[Member]:
@@ -473,6 +501,16 @@ class Guild(ClientSerializerMixin, IDMixin):
     def threads(self) -> List[Thread]:
         cache = self._client.cache[Thread]
         return [cache.get(id) for id in self._thread_ids]
+
+    @property
+    def emojis(self) -> List[Emoji]:
+        cache = self._client.cache[Emoji]
+        return [cache.get(id) for id in self._emoji_ids]
+
+    @property
+    def stickers(self) -> List[Sticker]:
+        cache = self._client.cache[Sticker]
+        return [cache.get(id) for id in self._sticker_ids]
 
     @property
     def voice_states(self) -> List["VoiceState"]:
@@ -569,12 +607,6 @@ class Guild(ClientSerializerMixin, IDMixin):
             reason=reason,
             delete_message_seconds=seconds,
         )
-
-        if not self.members:
-            return
-        for member in self.members:
-            if int(member.id) == _member_id:
-                return self.members.remove(member)
 
     async def remove_ban(
         self,
