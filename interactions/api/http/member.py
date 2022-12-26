@@ -36,18 +36,7 @@ class MemberRequest:
             )
         )
 
-        member = Member(**res, _client=self, guild_id=Snowflake(guild_id))
-        guild = self.cache[Guild].get(Snowflake(guild_id))
-        if guild.members is None:
-            guild.members = [member]
-        else:
-            for index, _member in enumerate(guild.members):
-                if _member.id == member.id:
-                    guild.members[index] = member
-                    break
-            else:
-                guild.members.append(member)
-        self.cache[Guild].add(guild)  # yes it should just be overwritten
+        self.cache[Member].merge(Member(**res, _client=self, guild_id=Snowflake(guild_id)))
 
         return res
 
@@ -67,22 +56,9 @@ class MemberRequest:
             payload["after"] = after
 
         res = await self._req.request(Route("GET", f"/guilds/{guild_id}/members"), params=payload)
-        guild = self.cache[Guild].get(Snowflake(guild_id))
-        if guild.members is None:
-            guild.members = [
-                Member(**_res, _client=self, guild_id=Snowflake(guild_id)) for _res in res
-            ]
-        else:
-            for member in [
-                Member(**_res, _client=self, guild_id=Snowflake(guild_id)) for _res in res
-            ]:
-                for index, _member in enumerate(guild.members):
-                    if _member.id == member.id:
-                        guild.members[index] = member
-                        break
-                else:
-                    guild.members.append(member)
-        self.cache[Guild].add(guild)  # yes it should just be overwritten
+
+        [self.cache[Member].merge(Member(**member, _client=self, guild_id=Snowflake(guild_id))) for member in res]
+
         return res
 
     async def search_guild_members(self, guild_id: int, query: str, limit: int = 1) -> List[dict]:
@@ -94,10 +70,14 @@ class MemberRequest:
         :param limit: The number of members to return. Defaults to 1.
         """
 
-        return await self._req.request(
+        res = await self._req.request(
             Route("GET", f"/guilds/{guild_id}/members/search"),
             params={"query": query, "limit": limit},
         )
+
+        [self.cache[Member].merge(Member(**member, _client=self, guild_id=Snowflake(guild_id))) for member in res]
+
+        return res
 
     async def add_member_role(
         self, guild_id: int, user_id: int, role_id: int, reason: Optional[str] = None

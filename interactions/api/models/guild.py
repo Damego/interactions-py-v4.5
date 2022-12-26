@@ -651,9 +651,6 @@ class Guild(ClientSerializerMixin, IDMixin):
             user_id=_member_id,
             reason=reason,
         )
-        for member in self.members:
-            if int(member.id) == _member_id:
-                return self.members.remove(member)
 
     async def add_member_role(
         self,
