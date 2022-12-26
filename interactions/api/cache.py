@@ -81,8 +81,6 @@ class Storage(Generic[_T]):
                 else:
                     setattr(old_item, attrib, getattr(item, attrib))
 
-        self.values[_id] = old_item
-
     def add(self, item: _T, id: Optional["Key"] = None) -> None:
         """
         Adds a new item to the storage.
