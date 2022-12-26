@@ -35,13 +35,19 @@ class MemberProcessor(BaseProcessor):
         if member is None:
             member = Member(**data)
 
+        guild = self._cache[Guild].get(guild_id)
+        guild._member_ids.remove(member.id)
+
         return (member,)
 
     def guild_members_chunk(self, data: dict) -> tuple:
         guild_members = events.GuildMembers(**data)
         cache = self._cache[Member]
 
+        guild = self._cache[Guild].get(guild_members.guild_id)
+
         for member in guild_members.members:
-            cache.add(member, id=(guild_members.guild_id, member.id))
+            cache.merge(member, id=(guild_members.guild_id, member.id))
+            guild._member_ids.add(member.id)
 
         return (guild_members,)
