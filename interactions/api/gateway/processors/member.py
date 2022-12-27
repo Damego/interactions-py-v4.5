@@ -8,7 +8,7 @@ from .base import BaseProcessor
 class MemberProcessor(BaseProcessor):
     def guild_member_add(self, data: dict) -> tuple:
         guild_id = Snowflake(data["guild_id"])
-        id = guild_id, Snowflake(data["id"])
+        id = guild_id, Snowflake(data["user"]["id"])
 
         member = self._create_event(Member, data, id=id)
         guild = self._cache[Guild].get(guild_id)
@@ -18,7 +18,7 @@ class MemberProcessor(BaseProcessor):
 
     def guild_member_update(self, data: dict) -> tuple:
         guild_id = Snowflake(data["guild_id"])
-        id = guild_id, Snowflake(data["id"])
+        id = guild_id, Snowflake(data["user"]["id"])
 
         before, after = self._update_event(Member, data, id=id)
 
