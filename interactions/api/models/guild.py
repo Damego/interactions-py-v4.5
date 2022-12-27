@@ -453,51 +453,61 @@ class Guild(ClientSerializerMixin, IDMixin):
     def __attrs_post_init__(self):
         if not self._client:
             return
-
         cache = self._client.cache
-        cache[Member].update(
-            {
-                (self.id, Snowflake(member["id"])): Member(member, _client=self._client)
-                for member in self._extras["members"]
-            }
-        )
-        cache[Role].update(
-            {
-                Snowflake(role["id"]): Role(role, _client=self._client)
-                for role in self._extras["roles"]
-            }
-        )
-        cache[Channel].update(
-            {
-                Snowflake(channel["id"]): Channel(channel, _client=self._client)
-                for channel in self._extras["channels"]
-            }
-        )
-        cache[Thread].update(
-            {
-                Snowflake(thread["id"]): Thread(thread, _client=self._client)
-                for thread in self._extras["threads"]
-            }
-        )
-        cache[Emoji].update(
-            {
-                Snowflake(emoji["id"]): Emoji(emoji, _client=self._client)
-                for emoji in self._extras["emojis"]
-            }
-        )
-        cache[Sticker].update(
-            {
-                Snowflake(sticker["id"]): Sticker(sticker, _client=self._client)
-                for sticker in self._extras["stickers"]
-            }
-        )
 
-        self._member_ids = {Snowflake(member["id"]) for member in self._extras["members"]}
-        self._role_ids = {Snowflake(role["id"]) for role in self._extras["roles"]}
-        self._channel_ids = {Snowflake(channel["id"]) for channel in self._extras["channels"]}
-        self._thread_ids = {Snowflake(thread["id"]) for thread in self._extras["threads"]}
-        self._emoji_ids = {Snowflake(emoji["id"]) for emoji in self._extras["emojis"]}
-        self._sticker_ids = {Snowflake(sticker["id"]) for sticker in self._extras["stickers"]}
+        if members := self._extras.get("members"):
+            cache[Member].update(
+                {
+                    (self.id, Snowflake(member["user"]["id"])): Member(**member, _client=self._client)
+                    for member in members
+                }
+            )
+            self._member_ids = {Snowflake(member["user"]["id"]) for member in members}
+            
+        if roles := self._extras.get("roles"):
+            cache[Role].update(
+                {
+                    Snowflake(role["id"]): Role(**role, _client=self._client)
+                    for role in roles
+                }
+            )
+            self._role_ids = {Snowflake(role["id"]) for role in roles}
+            
+        if channels := self._extras.get("channels"):
+            cache[Channel].update(
+                {
+                    Snowflake(channel["id"]): Channel(**channel, _client=self._client)
+                    for channel in channels
+                }
+            )
+            self._channel_ids = {Snowflake(channel["id"]) for channel in channels}
+            
+        if threads := self._extras.get("threads"):
+            cache[Thread].update(
+                {
+                    Snowflake(thread["id"]): Thread(**thread, _client=self._client)
+                    for thread in threads
+                }
+            )
+            self._thread_ids = {Snowflake(thread["id"]) for thread in threads}
+            
+        if emojis := self._extras.get("emojis"):
+            cache[Emoji].update(
+                {
+                    Snowflake(emoji["id"]): Emoji(**emoji, _client=self._client)
+                    for emoji in emojis
+                }
+            )
+            self._emoji_ids = {Snowflake(emoji["id"]) for emoji in emojis}
+
+        if stickers := self._extras.get("stickers"):
+            cache[Sticker].update(
+                {
+                    Snowflake(sticker["id"]): Sticker(**sticker, _client=self._client)
+                    for sticker in stickers
+                }
+            )
+            self._sticker_ids = {Snowflake(sticker["id"]) for sticker in stickers}
 
     @property
     def members(self) -> List[Member]:
