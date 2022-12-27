@@ -71,7 +71,6 @@ class Client:
 
     def __init__(
         self,
-        token: str,
         cache_limits: Optional[Dict[type, int]] = None,
         intents: Intents = Intents.DEFAULT,
         shards: Optional[List[Tuple[int]]] = None,
@@ -82,13 +81,12 @@ class Client:
         **kwargs,
     ) -> None:
         self._loop: AbstractEventLoop = get_event_loop()
-        self._http: Union[str, HTTPClient] = token
+        self._http: Optional[HTTPClient] = None
         self._intents: Intents = intents
         self._shards: List[Tuple[int]] = shards or []
         self._commands: List[Command] = []
         self._default_scope = default_scope
         self._presence = presence
-        self._token = token
         self._extensions = {}
         self._scopes = set()
         self.__command_coroutines = []
@@ -115,7 +113,6 @@ class Client:
 
         self._cache: Cache = Cache(cache_limits)
         self._websocket: WSClient = WSClient(
-            token=token,
             cache=self._cache,
             intents=self._intents,
             shards=self._shards,
@@ -189,11 +186,11 @@ class Client:
 
         return self._websocket.latency * 1000
 
-    def start(self) -> None:
+    def start(self, token: str) -> None:
         """Starts the client session."""
 
         try:
-            self._loop.run_until_complete(self._ready())
+            self._loop.run_until_complete(self._ready(token))
         except (CancelledError, Exception) as e:
             self._loop.run_until_complete(self._logout())
             raise e from e
@@ -396,7 +393,7 @@ class Client:
 
         return clean, _command
 
-    async def _ready(self) -> None:
+    async def _ready(self, token: str) -> None:
         """
         Prepares the client with an internal "ready" check to ensure
         that all conditions have been met in a chronological order:
@@ -415,8 +412,8 @@ class Client:
             |   |___ CALLBACK
             LOOP
         """
-        if isinstance(self._http, str):
-            self._http = HTTPClient(self._http, self._cache)
+        self._http = HTTPClient(token, self._cache)
+        self._websocket._http = self._http
 
         data = await self._http.get_current_bot_information()
         self.me = Application(**data, _client=self._http)

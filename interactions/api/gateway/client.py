@@ -139,7 +139,6 @@ class WebSocketClient:
 
     def __init__(
         self,
-        token: str,
         intents: Intents,
         cache: "Cache",
         session_id: Optional[str] = MISSING,
@@ -168,7 +167,7 @@ class WebSocketClient:
         self.__heartbeater: _Heartbeat = _Heartbeat(
             loop=self._loop if version_info < (3, 10) else None
         )
-        self._http: HTTPClient = token
+        self._http: Optional[HTTPClient] = None
         self._cache: "Cache" = cache
         self._event_processor: Optional[Processor] = None
 
@@ -261,8 +260,10 @@ class WebSocketClient:
         Handles the client's connection with the Gateway.
         """
 
-        if isinstance(self._http, str):
-            self._http = HTTPClient(self._http, self._cache)
+        if self._http is None:
+            raise RuntimeError("Missed http client")
+
+        if self._event_processor is None:
             self._event_processor = Processor(self._http)
 
         url = await self._http.get_gateway()
