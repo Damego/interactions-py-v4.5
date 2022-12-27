@@ -44,7 +44,6 @@ __all__ = (
     "GuildBan",
     "Webhooks",
     "GuildMembers",
-    "GuildMember",
     "GuildStickers",
     "GuildScheduledEventUser",
     "GuildScheduledEvent",
