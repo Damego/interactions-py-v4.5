@@ -1,5 +1,4 @@
 from datetime import datetime
-from enum import Enum, IntEnum
 from inspect import isawaitable
 from math import inf
 from typing import (
@@ -17,6 +16,7 @@ from typing import (
 )
 from warnings import warn
 
+from ...client.enums import IntEnum, StrEnum
 from ...utils.abc.base_iterators import DiscordPaginationIterator
 from ...utils.attrs_utils import (
     ClientSerializerMixin,
@@ -124,7 +124,7 @@ class InviteTargetType(IntEnum):
     EMBEDDED_APPLICATION = 2
 
 
-class GuildFeatures(Enum):
+class GuildFeatures(StrEnum):
     ANIMATED_BANNER = "ANIMATED_BANNER"
     ANIMATED_ICON = "ANIMATED_ICON"
     BANNER = "BANNER"
