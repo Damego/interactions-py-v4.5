@@ -6,7 +6,7 @@ from ...api.models.flags import MessageFlags
 if TYPE_CHECKING:
     from .component import ActionRow, Button, SelectMenu
     from ...api.models.misc import File, AllowedMentions
-    from ...api.models.message import Attachment, Embed
+    from ...api.models.message import Attachment, Embed, Sticker
 
 
 class Sendable:
@@ -29,7 +29,8 @@ class Sendable:
         files: Optional[Union["File", List["File"]]] = MISSING,
         embeds: Optional[Union["Embed", List["Embed"]]] = MISSING,
         allowed_mentions: Optional["AllowedMentions"] = MISSING,
-        flags: Optional[MessageFlags] = MISSING
+        flags: Optional[MessageFlags] = MISSING,
+        stickers: Optional[Union["Sticker", List["Sticker"]]] = MISSING
     ) -> Tuple[dict, List["File"]]:
         payload = {}
 
@@ -58,8 +59,13 @@ class Sendable:
 
         if attachments is not MISSING:
             payload["attachments"].extend([attachment._json for attachment in attachments])
-
         if flags is not MISSING:
             payload["flags"] = flags.value
+        if stickers is not MISSING:
+            payload["sticker_ids"] = (
+                [int(sticker.id) for sticker in stickers]
+                if isinstance(stickers, list)
+                else [stickers.id]
+            )
 
         return payload, files
