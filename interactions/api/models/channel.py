@@ -14,7 +14,6 @@ from typing import (
     Optional,
     Union,
 )
-from warnings import warn
 
 from ...client.enums import IntEnum
 from ...utils.abc.base_context_managers import BaseAsyncContextManager
@@ -36,6 +35,7 @@ from .misc import AllowedMentions, File, IDMixin, Overwrite, Snowflake
 from .role import Role
 from .user import User
 from .webhook import Webhook
+from ...client.models.sendable import Sendable
 
 if TYPE_CHECKING:
     from ...client.models.component import ActionRow, Button, SelectMenu
@@ -408,7 +408,7 @@ class ForumTag(ClientSerializerMixin):
 
 
 @define()
-class Channel(ClientSerializerMixin, IDMixin):
+class Channel(ClientSerializerMixin, Sendable, IDMixin):
     """
     A class object representing all types of channels.
 
@@ -687,52 +687,18 @@ class Channel(ClientSerializerMixin, IDMixin):
 
         if not self._client:
             raise LibraryException(code=13)
-        from ...client.models.component import _build_components
+
         from .message import Message
 
-        _content: str = "" if content is MISSING else content
-        _tts: bool = False if tts is MISSING else tts
-        _attachments = [] if attachments is MISSING else [a._json for a in attachments]
-        _allowed_mentions: dict = (
-            {}
-            if allowed_mentions is MISSING
-            else allowed_mentions._json
-            if isinstance(allowed_mentions, AllowedMentions)
-            else allowed_mentions
-        )
-        _sticker_ids: list = (
-            [] if stickers is MISSING else [str(sticker.id) for sticker in stickers]
-        )
-        if not embeds or embeds is MISSING:
-            _embeds: list = []
-        elif isinstance(embeds, list):
-            _embeds = [embed._json for embed in embeds]
-        else:
-            _embeds = [embeds._json]
-
-        if not components or components is MISSING:
-            _components = []
-        else:
-            _components = _build_components(components=components)
-
-        if not files or files is MISSING:
-            _files = []
-        elif isinstance(files, list):
-            _files = [file._json_payload(id) for id, file in enumerate(files)]
-        else:
-            _files = [files._json_payload(0)]
-            files = [files]
-
-        _files.extend(_attachments)
-
-        payload = dict(
-            content=_content,
-            tts=_tts,
-            attachments=_files,
-            embeds=_embeds,
-            allowed_mentions=_allowed_mentions,
-            components=_components,
-            sticker_ids=_sticker_ids,
+        payload, files = super().send(
+            content=content,
+            tts=tts,
+            attachments=attachments,
+            files=files,
+            embeds=embeds,
+            allowed_mentions=allowed_mentions,
+            stickers=stickers,
+            components=components,
         )
 
         res = await self._client.create_message(
