@@ -16,6 +16,7 @@ from typing import (
 )
 
 from ...client.enums import IntEnum
+from ...client.models.messageable import Messageable
 from ...utils.abc.base_context_managers import BaseAsyncContextManager
 from ...utils.abc.base_iterators import DiscordPaginationIterator
 from ...utils.attrs_utils import (
@@ -35,7 +36,6 @@ from .misc import AllowedMentions, File, IDMixin, Overwrite, Snowflake
 from .role import Role
 from .user import User
 from .webhook import Webhook
-from ...client.models.messageable import Messageable
 
 if TYPE_CHECKING:
     from ...client.models.component import ActionRow, Button, SelectMenu

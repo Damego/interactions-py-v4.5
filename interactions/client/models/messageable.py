@@ -1,12 +1,12 @@
-from typing import Optional, List, Union, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
-from ...utils.missing import MISSING
 from ...api.models.flags import MessageFlags
+from ...utils.missing import MISSING
 
 if TYPE_CHECKING:
-    from .component import ActionRow, Button, SelectMenu
-    from ...api.models.misc import File, AllowedMentions
     from ...api.models.message import Attachment, Embed, Sticker
+    from ...api.models.misc import AllowedMentions, File
+    from .component import ActionRow, Button, SelectMenu
 
 
 class Messageable:
@@ -43,7 +43,9 @@ class Messageable:
         if tts is not MISSING:
             payload["tts"] = tts
         if embeds is not MISSING:
-            payload["embeds"] = [embed._json for embed in embeds] if isinstance(embeds, list) else [embeds._json]
+            payload["embeds"] = (
+                [embed._json for embed in embeds] if isinstance(embeds, list) else [embeds._json]
+            )
         if allowed_mentions is not MISSING:
             payload["allowed_mentions"] = allowed_mentions._json
 

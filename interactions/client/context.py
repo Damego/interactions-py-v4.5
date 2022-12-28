@@ -8,7 +8,7 @@ from ..api.models.channel import Channel, Thread
 from ..api.models.flags import MessageFlags, Permissions
 from ..api.models.guild import Guild
 from ..api.models.member import Member
-from ..api.models.message import Attachment, Embed, File, Message, MessageReference
+from ..api.models.message import Attachment, Embed, File, Message
 from ..api.models.misc import AllowedMentions, Snowflake
 from ..api.models.user import User
 from ..base import get_logger
@@ -16,7 +16,7 @@ from ..utils.attrs_utils import ClientSerializerMixin, convert_int, define, fiel
 from ..utils.missing import MISSING
 from .enums import ComponentType, InteractionCallbackType, InteractionType, Locale
 from .models.command import Choice
-from .models.component import ActionRow, Button, Modal, SelectMenu, _build_components
+from .models.component import ActionRow, Button, Modal, SelectMenu
 from .models.messageable import Messageable
 from .models.misc import InteractionData
 
@@ -208,7 +208,7 @@ class _Context(ClientSerializerMixin, Messageable):
             embeds=embeds,
             allowed_mentions=allowed_mentions,
             components=components,
-            flags=flags
+            flags=flags,
         )
 
         # TODO: Do we really need this?

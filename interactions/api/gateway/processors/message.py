@@ -6,7 +6,7 @@ from .base import BaseProcessor
 
 class MessageProcessor(BaseProcessor):
     def message_create(self, data: dict) -> tuple:
-        return self._create_event(Message, data),
+        return (self._create_event(Message, data),)
 
     def message_update(self, data: dict) -> tuple:
         return self._update_event(Message, data)

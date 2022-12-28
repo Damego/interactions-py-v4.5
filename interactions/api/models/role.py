@@ -208,7 +208,4 @@ class Role(ClientSerializerMixin, IDMixin):
             reason=reason,
         )
 
-        return [
-            self._client.cache[Role].get(Snowflake(role["id"]))
-            for role in res
-        ]
+        return [self._client.cache[Role].get(Snowflake(role["id"])) for role in res]

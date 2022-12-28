@@ -1,12 +1,12 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional, Union
 
+from ...client.models.messageable import Sendable
 from ...utils.attrs_utils import ClientSerializerMixin, define, field
 from ...utils.missing import MISSING
 from ..error import LibraryException
 from .flags import UserFlags
 from .misc import AllowedMentions, File, IDMixin, Snowflake
-from ...client.models.messageable import Sendable
 
 if TYPE_CHECKING:
     from ...client.models.component import ActionRow, Button, SelectMenu
@@ -183,7 +183,7 @@ class User(ClientSerializerMixin, Sendable, IDMixin):
             attachments=attachments,
             files=files,
             embeds=embeds,
-            allowed_mentions=allowed_mentions
+            allowed_mentions=allowed_mentions,
         )
 
         channel = await self._client.create_dm(recipient_id=int(self.id))

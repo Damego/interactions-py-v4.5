@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, List, Optional, Union
 
 from ...client.enums import IntEnum
 from ...client.models.component import ActionRow, Button, SelectMenu
+from ...client.models.messageable import Messageable
 from ...utils.attrs_utils import (
     ClientSerializerMixin,
     DictSerializerMixin,
@@ -23,7 +24,6 @@ from .member import Member
 from .misc import AllowedMentions, File, IDMixin, Snowflake
 from .team import Application
 from .user import User
-from ...client.models.messageable import Messageable
 
 if TYPE_CHECKING:
     from ..http import HTTPClient
@@ -931,7 +931,7 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
             allowed_mentions=allowed_mentions,
             attachments=attachments,
             components=components,
-            flags=_flags
+            flags=_flags,
         )
 
         response = await self._client.edit_message(
