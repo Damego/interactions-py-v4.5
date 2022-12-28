@@ -76,6 +76,6 @@ class UserRequest:
         request = await self._req.request(
             Route("POST", "/users/@me/channels"), json={"recipient_id": recipient_id}
         )
-        self.cache[Channel].add(Channel(**request))
+        self.cache[Channel].add(Channel(**request, _client=self))
 
         return request
