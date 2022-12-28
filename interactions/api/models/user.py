@@ -6,6 +6,7 @@ from ...utils.missing import MISSING
 from ..error import LibraryException
 from .flags import UserFlags
 from .misc import AllowedMentions, File, IDMixin, Snowflake
+from ...client.models.sendable import Sendable
 
 if TYPE_CHECKING:
     from ...client.models.component import ActionRow, Button, SelectMenu
@@ -17,7 +18,7 @@ __all__ = ("User",)
 
 
 @define()
-class User(ClientSerializerMixin, IDMixin):
+class User(ClientSerializerMixin, Sendable, IDMixin):
     """
     A class object representing a user.
 
@@ -174,53 +175,23 @@ class User(ClientSerializerMixin, IDMixin):
         """
         if not self._client:
             raise LibraryException(code=13)
-        from ...client.models.component import _build_components
-        from .message import Message
 
-        _content: str = "" if content is MISSING else content
-        _tts: bool = False if tts is MISSING else tts
-        _attachments = [] if attachments is MISSING else [a._json for a in attachments]
-        _embeds: list = (
-            []
-            if not embeds or embeds is MISSING
-            else ([embed._json for embed in embeds] if isinstance(embeds, list) else [embeds._json])
+        payload, files = super().send(
+            content=content,
+            components=components,
+            tts=tts,
+            attachments=attachments,
+            files=files,
+            embeds=embeds,
+            allowed_mentions=allowed_mentions
         )
-        _allowed_mentions: dict = (
-            {}
-            if allowed_mentions is MISSING
-            else allowed_mentions._json
-            if isinstance(allowed_mentions, AllowedMentions)
-            else allowed_mentions
-        )
-        if not components or components is MISSING:
-            _components = []
-        else:
-            _components = _build_components(components=components)
 
-        if not files or files is MISSING:
-            _files = []
-        elif isinstance(files, list):
-            _files = [file._json_payload(id) for id, file in enumerate(files)]
-        else:
-            _files = [files._json_payload(0)]
-            files = [files]
-
-        _files.extend(_attachments)
-
-        payload = dict(
-            content=_content,
-            tts=_tts,
-            attachments=_files,
-            embeds=_embeds,
-            components=_components,
-            allowed_mentions=_allowed_mentions,
-        )
         channel = await self._client.create_dm(recipient_id=int(self.id))
         res = await self._client.create_message(
             channel_id=int(channel["id"]), payload=payload, files=files
         )
 
-        return Message(**res, _client=self._client)
+        return self._client.cache[Message].get(Snowflake(res["id"]))
 
     async def get_dm_channel(self) -> "Channel":
         """
@@ -236,4 +207,6 @@ class User(ClientSerializerMixin, IDMixin):
 
         from .channel import Channel
 
-        return Channel(**await self._client.create_dm(int(self.id)), _client=self._client)
+        channel = await self._client.create_dm(recipient_id=int(self.id))
+
+        return self._client.cache[Channel].get(Snowflake(channel["id"]))

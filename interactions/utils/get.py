@@ -22,7 +22,6 @@ else:
     from types import GenericAlias
 
 from ..api.error import LibraryException
-from ..api.models.emoji import Emoji
 from ..api.models.member import Member
 from ..api.models.message import Message
 from ..api.models.misc import Snowflake
@@ -253,6 +252,7 @@ async def _http_request(
             if isinstance(request, list)
             else obj(**await request, _client=http)
         )
+    from ..api.models.emoji import Emoji
 
     if obj in (Role, Emoji):
         from ..api.models.guild import Guild

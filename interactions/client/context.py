@@ -17,6 +17,7 @@ from ..utils.missing import MISSING
 from .enums import ComponentType, InteractionCallbackType, InteractionType, Locale
 from .models.command import Choice
 from .models.component import ActionRow, Button, Modal, SelectMenu, _build_components
+from .models.sendable import Sendable
 from .models.misc import InteractionData
 
 if TYPE_CHECKING:
@@ -33,7 +34,7 @@ __all__ = (
 
 
 @define()
-class _Context(ClientSerializerMixin):
+class _Context(ClientSerializerMixin, Sendable):
     """
     The base class of "context" for dispatched event data
     from the gateway. The premise of having this class is so
@@ -193,81 +194,32 @@ class _Context(ClientSerializerMixin):
         :param Optional[bool] suppress_embeds: Whether embeds are not shown in the message.
         :return: The sent message.
         """
-        if (
-            content is MISSING
-            and self.message
-            and self.callback == InteractionCallbackType.DEFERRED_UPDATE_MESSAGE
-        ):
-            _content = self.message.content
-        else:
-            _content: str = "" if content is MISSING else content
-        _tts: bool = False if tts is MISSING else tts
-
-        if (
-            embeds is MISSING
-            and self.message
-            and self.callback == InteractionCallbackType.DEFERRED_UPDATE_MESSAGE
-        ):
-            embeds = self.message.embeds
-        _embeds: list = (
-            []
-            if not embeds or embeds is MISSING
-            else ([embed._json for embed in embeds] if isinstance(embeds, list) else [embeds._json])
-        )
-        _allowed_mentions: dict = (
-            {}
-            if allowed_mentions is MISSING
-            else allowed_mentions._json
-            if isinstance(allowed_mentions, AllowedMentions)
-            else allowed_mentions
-        )
-
-        if components is not MISSING and components:
-            # components could be not missing but an empty list
-
-            _components = _build_components(components=components)
-        elif (
-            components is MISSING
-            and self.message
-            and self.callback == InteractionCallbackType.DEFERRED_UPDATE_MESSAGE
-        ):
-
-            if isinstance(self.message.components, list):
-                _components = self.message.components
-            else:
-                _components = [self.message.components]
-
-        else:
-            _components = []
-
-        _flags = MessageFlags.EPHEMERAL if ephemeral else MessageFlags(0)
+        flags = MessageFlags(0)
+        if ephemeral:
+            flags |= MessageFlags.EPHEMERAL
         if suppress_embeds:
-            _flags |= MessageFlags.SUPPRESS_EMBEDS
+            flags |= MessageFlags.SUPPRESS_EMBEDS
 
-        _attachments = [] if attachments is MISSING else [a._json for a in attachments]
-
-        if not files or files is MISSING:
-            _files = []
-        elif isinstance(files, list):
-            _files = [file._json_payload(id) for id, file in enumerate(files)]
-        else:
-            _files = [files._json_payload(0)]
-            files = [files]
-
-        _files.extend(_attachments)
-
-        return (
-            dict(
-                content=_content,
-                tts=_tts,
-                embeds=_embeds,
-                allowed_mentions=_allowed_mentions,
-                components=_components,
-                attachments=_files,
-                flags=_flags.value,
-            ),
-            files,
+        payload, files = super().send(
+            content=content,
+            tts=tts,
+            attachments=attachments,
+            files=files,
+            embeds=embeds,
+            allowed_mentions=allowed_mentions,
+            components=components,
+            flags=flags
         )
+
+        if self.callback == InteractionCallbackType.DEFERRED_UPDATE_MESSAGE and self.message:
+            if content is MISSING:
+                payload["content"] = self.message.content
+            if embeds is MISSING:
+                payload["embeds"] = self.message.embeds
+            if components is MISSING:
+                payload["components"] = self.message.components
+
+        return payload, files
 
     async def edit(
         self,
