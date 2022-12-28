@@ -35,7 +35,7 @@ from .misc import AllowedMentions, File, IDMixin, Overwrite, Snowflake
 from .role import Role
 from .user import User
 from .webhook import Webhook
-from ...client.models.sendable import Sendable
+from ...client.models.messageable import Messageable
 
 if TYPE_CHECKING:
     from ...client.models.component import ActionRow, Button, SelectMenu
@@ -408,7 +408,7 @@ class ForumTag(ClientSerializerMixin):
 
 
 @define()
-class Channel(ClientSerializerMixin, Sendable, IDMixin):
+class Channel(ClientSerializerMixin, Messageable, IDMixin):
     """
     A class object representing all types of channels.
 
@@ -690,7 +690,7 @@ class Channel(ClientSerializerMixin, Sendable, IDMixin):
 
         from .message import Message
 
-        payload, files = super().send(
+        payload, files = self._prepare_payload(
             content=content,
             tts=tts,
             attachments=attachments,

@@ -23,6 +23,7 @@ from .member import Member
 from .misc import AllowedMentions, File, IDMixin, Snowflake
 from .team import Application
 from .user import User
+from ...client.models.messageable import Messageable
 
 if TYPE_CHECKING:
     from ..http import HTTPClient
@@ -680,7 +681,7 @@ class ReactionObject(DictSerializerMixin):
 
 
 @define()
-class Message(ClientSerializerMixin, IDMixin):
+class Message(ClientSerializerMixin, Messageable, IDMixin):
     """
     A class object representing a message.
 
@@ -872,7 +873,6 @@ class Message(ClientSerializerMixin, IDMixin):
         embeds: Optional[Union["Embed", List["Embed"]]] = MISSING,
         suppress_embeds: Optional[bool] = MISSING,
         allowed_mentions: Optional[Union[AllowedMentions, dict]] = MISSING,
-        message_reference: Optional[MessageReference] = MISSING,
         attachments: Optional[List["Attachment"]] = MISSING,
         components: Optional[
             Union[
@@ -913,79 +913,35 @@ class Message(ClientSerializerMixin, IDMixin):
         if not self._client:
             raise LibraryException(code=13)
 
-        if self.flags == 64:
+        if self.flags == MessageFlags.EPHEMERAL:
             raise LibraryException(message="You cannot edit a hidden message!", code=12)
 
         _flags = self.flags
-        if suppress_embeds is not MISSING and suppress_embeds:
-            _flags |= MessageFlags.SUPPRESS_EMBEDS
-        elif suppress_embeds is not MISSING:
-            _flags &= ~MessageFlags.SUPPRESS_EMBEDS
+        if suppress_embeds is not MISSING:
+            if suppress_embeds:
+                _flags |= MessageFlags.SUPPRESS_EMBEDS
+            else:
+                _flags &= ~MessageFlags.SUPPRESS_EMBEDS
 
-        from ...client.models.component import _build_components
-
-        _content: str = self.content if content is MISSING else content
-        _tts: bool = False if tts is MISSING else tts
-
-        if attachments is MISSING:
-            _attachments = [a._json for a in self.attachments]
-        elif not attachments:
-            _attachments = []
-        else:
-            _attachments = [a._json for a in attachments]
-
-        if not files or files is MISSING:
-            _files = []
-        elif isinstance(files, list):
-            _files = [file._json_payload(id) for id, file in enumerate(files)]
-        else:
-            _files = [files._json_payload(0)]
-            files = [files]
-
-        _files.extend(_attachments)
-
-        if embeds is MISSING:
-            embeds = self.embeds
-        _embeds: list = (
-            ([embed._json for embed in embeds] if isinstance(embeds, list) else [embeds._json])
-            if embeds
-            else []
+        payload, files = self._prepare_payload(
+            content=content,
+            tts=tts,
+            files=files,
+            embeds=embeds,
+            allowed_mentions=allowed_mentions,
+            attachments=attachments,
+            components=components,
+            flags=_flags
         )
 
-        _allowed_mentions: dict = (
-            {}
-            if allowed_mentions is MISSING
-            else allowed_mentions._json
-            if isinstance(allowed_mentions, AllowedMentions)
-            else allowed_mentions
-        )
-        _message_reference: dict = {} if message_reference is MISSING else message_reference._json
-        if not components:
-            _components = []
-        elif components is MISSING:
-            _components = _build_components(components=self.components)
-        else:
-            _components = _build_components(components=components)
-
-        payload = dict(
-            content=_content,
-            tts=_tts,
-            attachments=_files,
-            embeds=_embeds,
-            allowed_mentions=_allowed_mentions,
-            message_reference=_message_reference,
-            components=_components,
-            flags=_flags,
-        )
-
-        _dct = await self._client.edit_message(
+        response = await self._client.edit_message(
             channel_id=int(self.channel_id),
             message_id=int(self.id),
             payload=payload,
             files=files,
         )
 
-        self.update(_dct)
+        self.update(response)
 
         return self
 

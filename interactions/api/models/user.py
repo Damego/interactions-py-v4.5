@@ -6,7 +6,7 @@ from ...utils.missing import MISSING
 from ..error import LibraryException
 from .flags import UserFlags
 from .misc import AllowedMentions, File, IDMixin, Snowflake
-from ...client.models.sendable import Sendable
+from ...client.models.messageable import Sendable
 
 if TYPE_CHECKING:
     from ...client.models.component import ActionRow, Button, SelectMenu

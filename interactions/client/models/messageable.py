@@ -9,9 +9,9 @@ if TYPE_CHECKING:
     from ...api.models.message import Attachment, Embed, Sticker
 
 
-class Sendable:
+class Messageable:
     @staticmethod
-    def send(
+    def _prepare_payload(
         *,
         content: Optional[str] = MISSING,
         components: Optional[

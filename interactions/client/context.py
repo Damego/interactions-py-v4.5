@@ -17,7 +17,7 @@ from ..utils.missing import MISSING
 from .enums import ComponentType, InteractionCallbackType, InteractionType, Locale
 from .models.command import Choice
 from .models.component import ActionRow, Button, Modal, SelectMenu, _build_components
-from .models.sendable import Sendable
+from .models.messageable import Messageable
 from .models.misc import InteractionData
 
 if TYPE_CHECKING:
@@ -34,7 +34,7 @@ __all__ = (
 
 
 @define()
-class _Context(ClientSerializerMixin, Sendable):
+class _Context(ClientSerializerMixin, Messageable):
     """
     The base class of "context" for dispatched event data
     from the gateway. The premise of having this class is so
@@ -200,7 +200,7 @@ class _Context(ClientSerializerMixin, Sendable):
         if suppress_embeds:
             flags |= MessageFlags.SUPPRESS_EMBEDS
 
-        payload, files = super().send(
+        payload, files = self._prepare_payload(
             content=content,
             tts=tts,
             attachments=attachments,
@@ -211,6 +211,7 @@ class _Context(ClientSerializerMixin, Sendable):
             flags=flags
         )
 
+        # TODO: Do we really need this?
         if self.callback == InteractionCallbackType.DEFERRED_UPDATE_MESSAGE and self.message:
             if content is MISSING:
                 payload["content"] = self.message.content
@@ -230,11 +231,10 @@ class _Context(ClientSerializerMixin, Sendable):
         files: Optional[Union[File, List[File]]] = MISSING,
         embeds: Optional[Union[Embed, List[Embed]]] = MISSING,
         allowed_mentions: Optional[Union[AllowedMentions, dict]] = MISSING,
-        message_reference: Optional[MessageReference] = MISSING,
         components: Optional[
             Union[ActionRow, Button, SelectMenu, List[ActionRow], List[Button], List[SelectMenu]]
         ] = MISSING,
-    ) -> Tuple[dict, List[File]]:  # sourcery skip: low-code-quality
+    ) -> Tuple[dict, List[File]]:
         """
         This allows the invocation state described in the "context"
         to send an interaction response.
@@ -248,79 +248,19 @@ class _Context(ClientSerializerMixin, Sendable):
             The files to attach to the message.
         :param Optional[Union[Embed, List[Embed]]] embeds: An embed, or list of embeds for the message.
         :param Optional[Union[AllowedMentions, dict]] allowed_mentions: The allowed mentions for the message.
-        :param Optional[MessageReference] message_reference: Include to make your message a reply.
         :param Optional[Union[ActionRow, Button, SelectMenu, List[Union[ActionRow, Button, SelectMenu]]]] components: A component, or list of components for the message.
         :return: The edited message.
         """
 
-        payload = {}
-
-        if self.message.content is not None or content is not MISSING:
-            _content: str = self.message.content if content is MISSING else content
-            payload["content"] = _content
-
-        _tts: bool = False if tts is MISSING else tts
-        payload["tts"] = _tts
-
-        if self.message.embeds is not None or embeds is not MISSING:
-            if embeds is MISSING:
-                embeds = self.message.embeds
-            _embeds: list = (
-                ([embed._json for embed in embeds] if isinstance(embeds, list) else [embeds._json])
-                if embeds
-                else []
-            )
-
-            payload["embeds"] = _embeds
-
-        if self.message.attachments is not None or attachments is not MISSING:
-            if attachments is MISSING:
-                attachments = self.message.attachments
-            _attachments: list = (
-                (
-                    [attachment._json for attachment in attachments]
-                    if isinstance(attachments, list)
-                    else [attachments._json]
-                )
-                if attachments
-                else []
-            )
-
-        if not files or files is MISSING:
-            _files = []
-        elif isinstance(files, list):
-            _files = [file._json_payload(id) for id, file in enumerate(files)]
-        else:
-            _files = [files._json_payload(0)]
-            files = [files]
-
-        _files.extend(_attachments)
-
-        payload["attachments"] = _files
-
-        _allowed_mentions: dict = (
-            {}
-            if allowed_mentions is MISSING
-            else allowed_mentions._json
-            if isinstance(allowed_mentions, AllowedMentions)
-            else allowed_mentions
+        return self._prepare_payload(
+            content=content,
+            tts=tts,
+            attachments=attachments,
+            files=files,
+            embeds=embeds,
+            allowed_mentions=allowed_mentions,
+            components=components,
         )
-        _message_reference: dict = {} if message_reference is MISSING else message_reference._json
-
-        payload["allowed_mentions"] = _allowed_mentions
-        payload["message_reference"] = _message_reference
-
-        if self.message.components is not None or components is not MISSING:
-            if components is MISSING:
-                _components = _build_components(components=self.message.components)
-            elif not components:
-                _components = []
-            else:
-                _components = _build_components(components=components)
-
-            payload["components"] = _components
-
-        return payload, files
 
     async def popup(self, modal: Modal) -> dict:
         """
