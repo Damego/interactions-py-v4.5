@@ -151,33 +151,32 @@ class Role(ClientSerializerMixin, IDMixin):
         """
         if not self._client:
             raise LibraryException(code=13)
-        _name = self.name if name is MISSING else name
-        _color = self.color if color is MISSING else color
-        _hoist = self.hoist if hoist is MISSING else hoist
-        _mentionable = self.mentionable if mentionable is MISSING else mentionable
-        _permissions = int(self.permissions if permissions is MISSING else permissions)
-        _icon = self.icon if icon is MISSING else icon
-        _unicode_emoji = self.unicode_emoji if unicode_emoji is MISSING else unicode_emoji
+
+        payload = {}
+
+        if name is not MISSING:
+            payload["name"] = name
+        if color is not MISSING:
+            payload["color"] = color
+        if hoist is not MISSING:
+            payload["hoist"] = hoist
+        if mentionable is not MISSING:
+            payload["mentionable"] = mentionable
+        if permissions is not MISSING:
+            payload["permissions"] = int(permissions)
+        if icon is not MISSING:
+            payload["icon"] = icon
+        if unicode_emoji is not MISSING:
+            payload["unicode_emoji"] = unicode_emoji
+
         _guild_id = int(guild_id) if isinstance(guild_id, (int, Snowflake)) else int(guild_id.id)
 
-        payload = dict(
-            name=_name,
-            color=_color,
-            hoist=_hoist,
-            mentionable=_mentionable,
-            permissions=_permissions,
-            icon=_icon,
-            unicode_emoji=_unicode_emoji,
-        )
-
-        res = await self._client.modify_guild_role(
+        await self._client.modify_guild_role(
             guild_id=_guild_id,
             role_id=int(self.id),
             payload=payload,
             reason=reason,
         )
-
-        self.update(res)
 
         return self
 
@@ -208,4 +207,8 @@ class Role(ClientSerializerMixin, IDMixin):
             payload=[{"position": position, "id": int(self.id)}],
             reason=reason,
         )
-        return [Role(**role, _client=self._client) for role in res]
+
+        return [
+            self._client.cache[Role].get(Snowflake(role["id"]))
+            for role in res
+        ]
