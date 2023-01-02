@@ -1194,266 +1194,267 @@ class Channel(ClientSerializerMixin, Messageable, IDMixin):
 
         from .message import Message
 
-        return self._client.cache[Message].get(Snowflake(message_id))
-
-    async def purge(
-        self,
-        amount: int,
-        check: Optional[Callable[[Any], Union[bool, Awaitable[bool]]]] = MISSING,
-        before: Optional[int] = MISSING,
-        reason: Optional[str] = None,
-        bulk: Optional[bool] = True,
-        force_bulk: Optional[bool] = False,
-    ) -> List["Message"]:
-        """
-        .. versionadded:: 4.1.0
         message = Message(**res, _client=self)
         self.cache[Message].merge(message)
 
-        Purges a given amount of messages from a channel. You can specify a check function to exclude specific messages.
+        return message
 
-        .. warning:: Calling this method can lead to rate-limits when purging higher amounts of messages.
-
-        .. code-block:: python
-
-            def check_pinned(message):
-                return not message.pinned  # This returns `True` only if the message is the message is not pinned
-            await channel.purge(100, check=check_pinned)
-            # This will delete the newest 100 messages that are not pinned in that channel
-
-        :param int amount: The amount of messages to delete
-        :param Optional[Callable[[Any], Union[bool, Awaitable[bool]]]] check:
-            The function used to check if a message should be deleted.
-            The message is only deleted if the check returns `True`
-        :param Optional[int] before: An id of a message to purge only messages before that message
-        :param Optional[bool] bulk:
-            Whether to use the bulk delete endpoint for deleting messages. This only works for 14 days
-
-            .. versionchanged:: 4.4.0
-                Purge now automatically continues deleting messages even after the 14 days limit was hit. Check
-                ``force_bulk`` for more information. If the 14 days span is exceeded the bot will encounter rate-limits
-                more frequently.
-        :param Optional[st] reason: The reason of the deletes
-        :param Optional[bool] force_bulk:
-            .. versionadded:: 4.4.0
-                Whether to stop deleting messages when the 14 days bulk limit was hit, default ``False``
-        :return: A list of the deleted messages
-        :rtype: List[Message]
-        """
-        if not self._client:
-            raise LibraryException(code=13)
-        from .message import Message
-
-        _before = None if before is MISSING else before
-        _all = []
-
-        async def normal_delete():
-            nonlocal _before, _all, amount, check, reason
-            while amount > 0:
-                messages = [
-                    self._client.cache[Message].get(Snowflake(res["id"]))
-                    for res in await self._client.get_channel_messages(
-                        channel_id=int(self.id),
-                        limit=min(amount, 100),
-                        before=_before,
-                    )
-                ]
-                if not messages:
-                    return _all
-
-                amount -= min(amount, 100)
-                messages2 = messages.copy()
-                for message in messages2:
-                    if (
-                        message.flags & MessageFlags.EPHEMERAL
-                        or message.flags & MessageFlags.LOADING
-                        or not message.deletable
-                    ):
-                        messages.remove(message)
-                        amount += 1
-                        _before = int(message.id)
-                    elif check is not MISSING:
-                        _check = check(message)
-                        if isawaitable(_check):
-                            _check = await _check
-                        if not _check:
-                            messages.remove(message)
-                            amount += 1
-                            _before = int(message.id)
-
-                for message in messages:  # show results faster
-                    await self._client.delete_message(
-                        channel_id=int(self.id),
-                        message_id=int(message.id),
-                        reason=reason,
-                    )
-
-                _all += messages
-
-            return _all
-
-        async def bulk_delete():
-            nonlocal _before, _all, amount, check, reason
-
-            _allowed_time = datetime.now(tz=timezone.utc) - timedelta(days=14)
-            _stop = False
-            while amount > 100:
-
-                messages = [
-                    self._client.cache[Message].get(Snowflake(res["id"]))
-                    for res in await self._client.get_channel_messages(
-                        channel_id=int(self.id),
-                        limit=100,
-                        before=_before,
-                    )
-                ]
-                if not messages:
-                    return _all
-                messages2 = messages.copy()
-                for message in messages2:
-                    if datetime.fromisoformat(str(message.timestamp)) < _allowed_time:
-                        messages.remove(message)
-                        _stop = True
-
-                    elif (
-                        message.flags & MessageFlags.EPHEMERAL
-                        or message.flags & MessageFlags.LOADING
-                        or not message.deletable
-                    ):
-                        messages.remove(message)
-                        amount += 1
-                        _before = int(message.id)
-                    elif check is not MISSING:
-                        _check = check(message)
-                        if isawaitable(_check):
-                            _check = await _check
-                        if not _check:
-                            messages.remove(message)
-                            amount += 1
-                            _before = int(message.id)
-                _all += messages
-                if len(messages) > 1:
-                    await self._client.delete_messages(
-                        channel_id=int(self.id),
-                        message_ids=[int(message.id) for message in messages],
-                        reason=reason,
-                    )
-                elif len(messages) == 1:
-                    await self._client.delete_message(
-                        channel_id=int(self.id),
-                        message_id=int(messages[0].id),
-                        reason=reason,
-                    )
-                elif _stop:
-                    return _all
-                else:
-                    continue
-                if _stop:
-                    return _all
-
-                amount -= 100
-
-            while amount > 1:
-                messages = [
-                    self._client.cache[Message].get(Snowflake(res["id"]))
-                    for res in await self._client.get_channel_messages(
-                        channel_id=int(self.id),
-                        limit=amount,
-                        before=_before,
-                    )
-                ]
-                if not messages:
-                    return _all
-                amount -= amount
-                messages2 = messages.copy()
-                for message in messages2:
-                    if datetime.fromisoformat(str(message.timestamp)) < _allowed_time:
-                        messages.remove(message)
-                        _stop = True
-                    elif (
-                        message.flags & MessageFlags.EPHEMERAL
-                        or message.flags & MessageFlags.LOADING
-                        or not message.deletable
-                    ):
-                        messages.remove(message)
-                        amount += 1
-                        _before = int(message.id)
-                    elif check is not MISSING:
-                        _check = check(message)
-                        if isawaitable(_check):
-                            _check = await _check
-                        if not _check:
-                            messages.remove(message)
-                            amount += 1
-                            _before = int(message.id)
-                _all += messages
-                if len(messages) > 1:
-                    await self._client.delete_messages(
-                        channel_id=int(self.id),
-                        message_ids=[int(message.id) for message in messages],
-                        reason=reason,
-                    )
-                elif len(messages) == 1:
-                    await self._client.delete_message(
-                        channel_id=int(self.id),
-                        message_id=int(messages[0].id),
-                        reason=reason,
-                    )
-                elif _stop:
-                    return _all
-                else:
-                    continue
-                if _stop:
-                    return _all
-            while amount == 1:
-                messages = [
-                    self._client.cache[Message].get(Snowflake(res["id"]))
-                    for res in await self._client.get_channel_messages(
-                        channel_id=int(self.id),
-                        limit=amount,
-                        before=_before,
-                    )
-                ]
-                if not messages:
-                    return _all
-                amount -= 1
-                messages2 = messages.copy()
-                for message in messages2:
-                    if (
-                        message.flags & MessageFlags.EPHEMERAL
-                        or message.flags & MessageFlags.LOADING
-                        or not message.deletable
-                    ):
-                        messages.remove(message)
-                        amount += 1
-                        _before = int(message.id)
-                    elif check is not MISSING:
-                        _check = check(message)
-                        if isawaitable(_check):
-                            _check = await _check
-                        if not _check:
-                            messages.remove(message)
-                            amount += 1
-                            _before = int(message.id)
-                _all += messages
-                if not messages:
-                    continue
-                await self._client.delete_message(
-                    channel_id=int(self.id),
-                    message_id=int(messages[0].id),
-                    reason=reason,
-                )
-            return _all
-
-        if bulk:
-            await bulk_delete()
-            if not force_bulk:
-                await normal_delete()
-            return _all
-
-        await normal_delete()
-
-        return _all
+    # TODO: What the fuck is it?
+    # async def purge(
+    #     self,
+    #     amount: int,
+    #     check: Optional[Callable[[Any], Union[bool, Awaitable[bool]]]] = MISSING,
+    #     before: Optional[int] = MISSING,
+    #     reason: Optional[str] = None,
+    #     bulk: Optional[bool] = True,
+    #     force_bulk: Optional[bool] = False,
+    # ) -> List["Message"]:
+    #     """
+    #     .. versionadded:: 4.1.0
+    #
+    #     Purges a given amount of messages from a channel. You can specify a check function to exclude specific messages.
+    #
+    #     .. warning:: Calling this method can lead to rate-limits when purging higher amounts of messages.
+    #
+    #     .. code-block:: python
+    #
+    #         def check_pinned(message):
+    #             return not message.pinned  # This returns `True` only if the message is the message is not pinned
+    #         await channel.purge(100, check=check_pinned)
+    #         # This will delete the newest 100 messages that are not pinned in that channel
+    #
+    #     :param int amount: The amount of messages to delete
+    #     :param Optional[Callable[[Any], Union[bool, Awaitable[bool]]]] check:
+    #         The function used to check if a message should be deleted.
+    #         The message is only deleted if the check returns `True`
+    #     :param Optional[int] before: An id of a message to purge only messages before that message
+    #     :param Optional[bool] bulk:
+    #         Whether to use the bulk delete endpoint for deleting messages. This only works for 14 days
+    #
+    #         .. versionchanged:: 4.4.0
+    #             Purge now automatically continues deleting messages even after the 14 days limit was hit. Check
+    #             ``force_bulk`` for more information. If the 14 days span is exceeded the bot will encounter rate-limits
+    #             more frequently.
+    #     :param Optional[st] reason: The reason of the deletes
+    #     :param Optional[bool] force_bulk:
+    #         .. versionadded:: 4.4.0
+    #             Whether to stop deleting messages when the 14 days bulk limit was hit, default ``False``
+    #     :return: A list of the deleted messages
+    #     :rtype: List[Message]
+    #     """
+    #     if not self._client:
+    #         raise LibraryException(code=13)
+    #
+    #     _before = None if before is MISSING else before
+    #     _all = []
+    #
+    #     async def normal_delete():
+    #         nonlocal _before, _all, amount, check, reason
+    #         while amount > 0:
+    #             messages = [
+    #                 res
+    #                 for res in await self._client.get_channel_messages(
+    #                     channel_id=int(self.id),
+    #                     limit=min(amount, 100),
+    #                     before=_before,
+    #                 )
+    #             ]
+    #             if not messages:
+    #                 return _all
+    #
+    #             amount -= min(amount, 100)
+    #             messages2 = messages.copy()
+    #             for message in messages2:
+    #                 if (
+    #                     message.flags & MessageFlags.EPHEMERAL
+    #                     or message.flags & MessageFlags.LOADING
+    #                     or not message.deletable
+    #                 ):
+    #                     messages.remove(message)
+    #                     amount += 1
+    #                     _before = int(message.id)
+    #                 elif check is not MISSING:
+    #                     _check = check(message)
+    #                     if isawaitable(_check):
+    #                         _check = await _check
+    #                     if not _check:
+    #                         messages.remove(message)
+    #                         amount += 1
+    #                         _before = int(message["id"])
+    #
+    #             for message in messages:  # show results faster
+    #                 await self._client.delete_message(
+    #                     channel_id=int(self.id),
+    #                     message_id=int(message["id"]),
+    #                     reason=reason,
+    #                 )
+    #
+    #             _all += messages
+    #
+    #         return _all
+    #
+    #     async def bulk_delete():
+    #         nonlocal _before, _all, amount, check, reason
+    #
+    #         _allowed_time = datetime.now(tz=timezone.utc) - timedelta(days=14)
+    #         _stop = False
+    #         while amount > 100:
+    #
+    #             messages = [
+    #                 res
+    #                 for res in await self._client.get_channel_messages(
+    #                     channel_id=int(self.id),
+    #                     limit=100,
+    #                     before=_before,
+    #                 )
+    #             ]
+    #             if not messages:
+    #                 return _all
+    #             messages2 = messages.copy()
+    #             for message in messages2:
+    #                 if datetime.fromisoformat(str(message.timestamp)) < _allowed_time:
+    #                     messages.remove(message)
+    #                     _stop = True
+    #
+    #                 elif (
+    #                     message["flags"] & MessageFlags.EPHEMERAL
+    #                     or message["flags"] & MessageFlags.LOADING
+    #                     or not message.deletable
+    #                 ):
+    #                     messages.remove(message)
+    #                     amount += 1
+    #                     _before = int(message.id)
+    #                 elif check is not MISSING:
+    #                     _check = check(message)
+    #                     if isawaitable(_check):
+    #                         _check = await _check
+    #                     if not _check:
+    #                         messages.remove(message)
+    #                         amount += 1
+    #                         _before = int(message.id)
+    #             _all += messages
+    #             if len(messages) > 1:
+    #                 await self._client.delete_messages(
+    #                     channel_id=int(self.id),
+    #                     message_ids=[int(message.id) for message in messages],
+    #                     reason=reason,
+    #                 )
+    #             elif len(messages) == 1:
+    #                 await self._client.delete_message(
+    #                     channel_id=int(self.id),
+    #                     message_id=int(messages[0].id),
+    #                     reason=reason,
+    #                 )
+    #             elif _stop:
+    #                 return _all
+    #             else:
+    #                 continue
+    #             if _stop:
+    #                 return _all
+    #
+    #             amount -= 100
+    #
+    #         while amount > 1:
+    #             messages = [
+    #                 self._client.cache[Message].get(Snowflake(res["id"]))
+    #                 for res in await self._client.get_channel_messages(
+    #                     channel_id=int(self.id),
+    #                     limit=amount,
+    #                     before=_before,
+    #                 )
+    #             ]
+    #             if not messages:
+    #                 return _all
+    #             amount -= amount
+    #             messages2 = messages.copy()
+    #             for message in messages2:
+    #                 if datetime.fromisoformat(str(message.timestamp)) < _allowed_time:
+    #                     messages.remove(message)
+    #                     _stop = True
+    #                 elif (
+    #                     message.flags & MessageFlags.EPHEMERAL
+    #                     or message.flags & MessageFlags.LOADING
+    #                     or not message.deletable
+    #                 ):
+    #                     messages.remove(message)
+    #                     amount += 1
+    #                     _before = int(message.id)
+    #                 elif check is not MISSING:
+    #                     _check = check(message)
+    #                     if isawaitable(_check):
+    #                         _check = await _check
+    #                     if not _check:
+    #                         messages.remove(message)
+    #                         amount += 1
+    #                         _before = int(message.id)
+    #             _all += messages
+    #             if len(messages) > 1:
+    #                 await self._client.delete_messages(
+    #                     channel_id=int(self.id),
+    #                     message_ids=[int(message.id) for message in messages],
+    #                     reason=reason,
+    #                 )
+    #             elif len(messages) == 1:
+    #                 await self._client.delete_message(
+    #                     channel_id=int(self.id),
+    #                     message_id=int(messages[0].id),
+    #                     reason=reason,
+    #                 )
+    #             elif _stop:
+    #                 return _all
+    #             else:
+    #                 continue
+    #             if _stop:
+    #                 return _all
+    #         while amount == 1:
+    #             messages = [
+    #                 self._client.cache[Message].get(Snowflake(res["id"]))
+    #                 for res in await self._client.get_channel_messages(
+    #                     channel_id=int(self.id),
+    #                     limit=amount,
+    #                     before=_before,
+    #                 )
+    #             ]
+    #             if not messages:
+    #                 return _all
+    #             amount -= 1
+    #             messages2 = messages.copy()
+    #             for message in messages2:
+    #                 if (
+    #                     message.flags & MessageFlags.EPHEMERAL
+    #                     or message.flags & MessageFlags.LOADING
+    #                     or not message.deletable
+    #                 ):
+    #                     messages.remove(message)
+    #                     amount += 1
+    #                     _before = int(message.id)
+    #                 elif check is not MISSING:
+    #                     _check = check(message)
+    #                     if isawaitable(_check):
+    #                         _check = await _check
+    #                     if not _check:
+    #                         messages.remove(message)
+    #                         amount += 1
+    #                         _before = int(message.id)
+    #             _all += messages
+    #             if not messages:
+    #                 continue
+    #             await self._client.delete_message(
+    #                 channel_id=int(self.id),
+    #                 message_id=int(messages[0].id),
+    #                 reason=reason,
+    #             )
+    #         return _all
+    #
+    #     if bulk:
+    #         await bulk_delete()
+    #         if not force_bulk:
+    #             await normal_delete()
+    #         return _all
+    #
+    #     await normal_delete()
+    #
+    #     return _all
 
     async def create_thread(
         self,
