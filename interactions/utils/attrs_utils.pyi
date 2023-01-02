@@ -4,6 +4,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, Un
 import attrs
 
 from interactions.api.http.client import HTTPClient
+from interactions.api.cache import Cache
 
 _T = TypeVar("_T")
 _P = TypeVar("_P")
@@ -21,9 +22,12 @@ class DictSerializerMixin:
     @property
     def _json(self) -> dict: ...
 
+    def update(self, kwargs_dict: dict = None, /, **other_kwargs): ...
+
 
 @attrs.define(eq=False, init=False, on_setattr=attrs.setters.NO_OP)
 class ClientSerializerMixin(DictSerializerMixin):
+    cache: Cache = attrs.field(init=False)
     _client: HTTPClient = attrs.field(init=False)
     def __init__(self, kwargs_dict: dict = None, /, **other_kwargs): ...
 
