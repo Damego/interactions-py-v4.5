@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional, Union
 
-from ...client.models.messageable import Sendable
+from ...client.models.messageable import Messageable
 from ...utils.attrs_utils import ClientSerializerMixin, define, field
 from ...utils.missing import MISSING
 from ..error import LibraryException
@@ -18,7 +18,7 @@ __all__ = ("User",)
 
 
 @define()
-class User(ClientSerializerMixin, Sendable, IDMixin):
+class User(ClientSerializerMixin, Messageable, IDMixin):
     """
     A class object representing a user.
 
@@ -176,7 +176,7 @@ class User(ClientSerializerMixin, Sendable, IDMixin):
         if not self._client:
             raise LibraryException(code=13)
 
-        payload, files = super().send(
+        payload, files = self._prepare_payload(
             content=content,
             components=components,
             tts=tts,
