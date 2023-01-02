@@ -1207,6 +1207,8 @@ class Channel(ClientSerializerMixin, Messageable, IDMixin):
     ) -> List["Message"]:
         """
         .. versionadded:: 4.1.0
+        message = Message(**res, _client=self)
+        self.cache[Message].merge(message)
 
         Purges a given amount of messages from a channel. You can specify a check function to exclude specific messages.
 
