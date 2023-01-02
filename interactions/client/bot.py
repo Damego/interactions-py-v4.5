@@ -111,9 +111,9 @@ class Client:
                 Message: 1000,  # Most users won't need to cache many messages
             }
 
-        self._cache: Cache = Cache(cache_limits)
+        self.cache: Cache = Cache(cache_limits)
         self._websocket: WSClient = WSClient(
-            cache=self._cache,
+            cache=self.cache,
             intents=self._intents,
             shards=self._shards,
             presence=self._presence,
@@ -412,7 +412,7 @@ class Client:
             |   |___ CALLBACK
             LOOP
         """
-        self._http = HTTPClient(token, self._cache)
+        self._http = HTTPClient(token, self.cache)
         self._websocket._http = self._http
 
         data = await self._http.get_current_bot_information()
