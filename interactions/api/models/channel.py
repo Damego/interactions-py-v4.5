@@ -548,9 +548,12 @@ class Channel(ClientSerializerMixin, Messageable, IDMixin):
         :rtype: Guild
         """
         _id = self.guild_id
+        if _id is None:
+            return
+
         from .guild import Guild
 
-        return self._client.cache[Guild].get(_id, None) if _id else None
+        return self.cache[Guild].get(_id)
 
     @property
     def typing(self) -> Union[Awaitable, ContextManager]:
@@ -590,16 +593,12 @@ class Channel(ClientSerializerMixin, Messageable, IDMixin):
                 code=14, message="Cannot only get voice states from a voice channel!"
             )
 
-        if not self._client:
-            raise LibraryException(code=13)
-
         from .gw import VoiceState
 
-        states: List[VoiceState] = []
-
-        data = self._client.cache[VoiceState].values.values()
-        states.extend(state for state in data if state.channel_id == self.id)
-        return states
+        return [
+            state for state in self.cache[VoiceState].values.values()
+            if state.channel_id == self.id
+        ]
 
     @property
     def created_at(self) -> datetime:
@@ -705,7 +704,16 @@ class Channel(ClientSerializerMixin, Messageable, IDMixin):
             channel_id=int(self.id), payload=payload, files=files
         )
 
-        return self._client.cache[Message].get(Snowflake(res["id"]))
+        # dumb hack, discord doesn't send the full author data
+        author = {"id": None, "username": None, "discriminator": None}
+        author.update(res["author"])
+        res["author"] = author
+
+        message = Message(**res, _client=self)
+
+        self.cache[Message].add(message)
+
+        return message
 
     async def delete(self) -> None:
         """
@@ -729,7 +737,7 @@ class Channel(ClientSerializerMixin, Messageable, IDMixin):
         rate_limit_per_user: Optional[int] = MISSING,
         position: Optional[int] = MISSING,
         permission_overwrites: Optional[List[Overwrite]] = MISSING,
-        parent_id: Optional[int] = MISSING,
+        parent_id: Optional[int, str, Snowflake] = MISSING,
         nsfw: Optional[bool] = MISSING,
         archived: Optional[bool] = MISSING,
         auto_archive_duration: Optional[int] = MISSING,
@@ -941,7 +949,7 @@ class Channel(ClientSerializerMixin, Messageable, IDMixin):
 
     async def set_parent_id(
         self,
-        parent_id: int,
+        parent_id: Union[int, str, Snowflake],
         *,
         reason: Optional[str] = None,
     ) -> "Channel":
@@ -1181,7 +1189,6 @@ class Channel(ClientSerializerMixin, Messageable, IDMixin):
             channel_id=int(self.id),
             message_id=int(message_id),
         )
-
         if res is None:
             return
 
@@ -1497,7 +1504,10 @@ class Channel(ClientSerializerMixin, Messageable, IDMixin):
             reason=reason,
         )
 
-        return self._client.cache[Thread].get(Snowflake(res["id"]))
+        thread = Thread(**res, _client=self)
+        self.cache[Thread].add(thread)
+
+        return thread
 
     @property
     def url(self) -> str:

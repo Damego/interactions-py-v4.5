@@ -98,20 +98,11 @@ class MessageRequest:
                     "form-data", name=f"files[{str(id)}]", filename=file._filename
                 )
 
-        request = await self._req.request(
+        return await self._req.request(
             Route("POST", "/channels/{channel_id}/messages", channel_id=channel_id),
             json=payload,
             data=data,
         )
-
-        # dumb hack, discord doesn't send the full author data
-        author = {"id": None, "username": None, "discriminator": None}
-        author.update(request["author"])
-        request["author"] = author
-
-        self.cache[Message].add(Message(**request, _client=self))
-
-        return request
 
     async def get_message(self, channel_id: int, message_id: int) -> Optional[dict]:
         """
@@ -121,12 +112,7 @@ class MessageRequest:
         :param message_id: the id of the message
         :return: message if it exists.
         """
-        res = await self._req.request(Route("GET", f"/channels/{channel_id}/messages/{message_id}"))
-
-        if res is not None:
-            self.cache[Message].merge(Message(**res, _client=self))
-
-        return res
+        return await self._req.request(Route("GET", f"/channels/{channel_id}/messages/{message_id}"))
 
     async def delete_message(
         self, channel_id: int, message_id: int, reason: Optional[str] = None

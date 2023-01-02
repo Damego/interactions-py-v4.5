@@ -40,8 +40,6 @@ class ChannelRequest:
         """
         await self._req.request(Route("DELETE", "/channels/{channel_id}", channel_id=channel_id))
 
-        self.cache[Channel].pop(Snowflake(channel_id))
-
     async def get_channel_messages(
         self,
         channel_id: int,
