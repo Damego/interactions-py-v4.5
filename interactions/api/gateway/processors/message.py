@@ -12,7 +12,7 @@ class MessageProcessor(BaseProcessor):
         return self._update_event(Message, data)
 
     def message_delete(self, data: dict) -> tuple:
-        message = self._delete_event(Message, id=Snowflake(data["id"]))
+        message = self._delete_event(Message, data, id=Snowflake(data["id"]))
 
         return (message,)
 
