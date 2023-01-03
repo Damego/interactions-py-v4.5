@@ -10,6 +10,7 @@ from .flags import Permissions
 from .misc import AllowedMentions, File, IDMixin, Snowflake
 from .role import Role
 from .user import User
+from ...client.models.messageable import Messageable
 
 if TYPE_CHECKING:
     from ...client.models.component import ActionRow, Button, SelectMenu
@@ -21,7 +22,7 @@ __all__ = ("Member",)
 
 
 @define()
-class Member(ClientSerializerMixin, IDMixin):
+class Member(ClientSerializerMixin, IDMixin, Messageable):
     """
     A class object representing the user of a guild, known as a "member."
 
@@ -267,6 +268,8 @@ class Member(ClientSerializerMixin, IDMixin):
             delete_message_seconds=seconds,
         )
 
+        self.cache.remove_member(self.user.id, Snowflake(_guild_id))
+
     async def kick(
         self,
         guild_id: Optional[Union[int, Snowflake, "Guild"]] = MISSING,
@@ -302,6 +305,8 @@ class Member(ClientSerializerMixin, IDMixin):
             user_id=int(self.user.id),
             reason=reason,
         )
+
+        self.cache.remove_member(self.user.id, Snowflake(_guild_id))
 
     async def add_role(
         self,
@@ -342,6 +347,8 @@ class Member(ClientSerializerMixin, IDMixin):
             reason=reason,
         )
 
+        self.roles.append(_role)
+
     async def remove_role(
         self,
         role: Union[Role, int],
@@ -380,6 +387,8 @@ class Member(ClientSerializerMixin, IDMixin):
             role_id=_role,
             reason=reason,
         )
+
+        self.roles.remove(_role)
 
     async def send(
         self,
@@ -424,53 +433,25 @@ class Member(ClientSerializerMixin, IDMixin):
         """
         if not self._client:
             raise LibraryException(code=13)
-        from ...client.models.component import _build_components
-        from .message import Message
 
-        _content: str = "" if content is MISSING else content
-        _tts: bool = False if tts is MISSING else tts
-        _attachments = [] if attachments is MISSING else [a._json for a in attachments]
-        _embeds: list = (
-            []
-            if not embeds or embeds is MISSING
-            else ([embed._json for embed in embeds] if isinstance(embeds, list) else [embeds._json])
+        payload, files = self._prepare_payload(
+            content=content,
+            components=components,
+            tts=tts,
+            attachments=attachments,
+            files=files,
+            embeds=embeds,
+            allowed_mentions=allowed_mentions,
         )
-        _allowed_mentions: dict = (
-            {}
-            if allowed_mentions is MISSING
-            else allowed_mentions._json
-            if isinstance(allowed_mentions, AllowedMentions)
-            else allowed_mentions
-        )
-        if not components or components is MISSING:
-            _components = []
-        else:
-            _components = _build_components(components=components)
 
-        if not files or files is MISSING:
-            _files = []
-        elif isinstance(files, list):
-            _files = [file._json_payload(id) for id, file in enumerate(files)]
-        else:
-            _files = [files._json_payload(0)]
-            files = [files]
+        channel_res = await self._client.create_dm(recipient_id=int(self.user.id))
+        channel = self.cache.add_channel(channel_res)
 
-        _files.extend(_attachments)
-
-        payload = dict(
-            content=_content,
-            tts=_tts,
-            attachments=_files,
-            embeds=_embeds,
-            components=_components,
-            allowed_mentions=_allowed_mentions,
-        )
-        channel = Channel(**await self._client.create_dm(recipient_id=int(self.user.id)))
-        res = await self._client.create_message(
+        message_res = await self._client.create_message(
             channel_id=int(channel.id), payload=payload, files=files
         )
 
-        return Message(**res, _client=self._client)
+        return self.cache.add_message(message_res)
 
     async def modify(
         self,
