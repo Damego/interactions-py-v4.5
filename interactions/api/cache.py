@@ -190,8 +190,8 @@ class Cache:
         self.storages[type].merge(object, object_id)
         return object
 
-    def get_guild(self, guild_id: interactions.Snowflake) -> interactions.Guild:
-        return self._get_object(interactions.Guild, guild_id)
+    def get_guild(self, guild_id: interactions.Snowflake = None) -> Optional[interactions.Guild]:
+        return self._get_object(interactions.Guild, guild_id) if guild_id else None
 
     def add_guild(self, data: dict) -> interactions.Guild:
         return self._add_object(data, interactions.Guild)
@@ -202,7 +202,7 @@ class Cache:
     def get_channel(self, channel_id: interactions.Snowflake) -> Optional[interactions.Channel]:
         return self._get_object(interactions.Channel, channel_id)
 
-    def add_channel(self, data: dict, guild_id: interactions.Snowflake) -> interactions.Channel:
+    def add_channel(self, data: dict, guild_id: interactions.Snowflake = None) -> interactions.Channel:
         channel = self._add_object(data, interactions.Channel)
 
         if guild := self.get_guild(guild_id):
@@ -343,3 +343,18 @@ class Cache:
             guild._sticker_ids.remove(sticker_id)
 
         return sticker
+
+    def get_message(self, message_id: interactions.Snowflake) -> Optional[interactions.Message]:
+        return self._get_object(interactions.Message, message_id)
+
+    def add_message(self, data: dict) -> interactions.Message:
+        return self._add_object(data, interactions.Message)
+
+    def add_messages(self, data: List[dict]) -> List[interactions.Message]:
+        return [
+            self.add_message(message)
+            for message in data
+        ]
+
+    def remove_message(self, message_id: interactions.Snowflake) -> interactions.Message:
+        return self.storages[interactions.Message].pop(message_id)
