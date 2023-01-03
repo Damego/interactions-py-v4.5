@@ -17,13 +17,9 @@ What changed?
 -------------
 - Refactored event dispatching. Removed cursed dynamic code and replaced with processors.
 - Made ``channels``, ``members``, ``roles``, ``threads`` for ``Guild`` as property which will use cache.
-- Made stickers and emojis cache and made they as property of ``Guild``.
-- Cleaned up code (partially). Removed duplicate code in http and helpers, removed guild modifying and more stuff.
-- Got rid of ``GuildMember``.
+- Made stickers and emojis store in the cache and made they as property of ``Guild``.
+- Cleaned up code (partially). Removed duplicate code in http and in helper methods, removed guild modifying and more stuff.
+- Removed ``GuildMember``.
 - Renamed ``Tags`` to ``ForumTag``
 
-What planned?
--------------
 
-- Rewrite gateway with using ``anyio`` library.
-- Use ``cattrs`` to [un]structure dataclasses.
