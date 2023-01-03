@@ -156,9 +156,10 @@ class Cache:
     :ivar defaultdict[Type, Storage] storages: A dictionary denoting the Type and the objects that correspond to the Type.
     """
 
-    __slots__ = ("storages", "config")
+    __slots__ = ("_http", "storages", "config")
 
     def __init__(self, config: Dict[Type[_T], int] = None) -> None:
+        self._http: interactions.HTTPClient
         self.storages: Dict[Type[_T], Storage[_T]] = defaultdict(Storage)
 
         if config is not None:
@@ -167,3 +168,110 @@ class Cache:
 
     def __getitem__(self, item: Type[_T]) -> Storage[_T]:
         return self.storages[item]
+
+    def _get_object(self, type: Type[_T], object_id: Union[interactions.Snowflake, Tuple[interactions.Snowflake, interactions.Snowflake]]) -> _T:
+        return self.storages[type].get(object_id)
+
+    def _add_object(self, data: dict, type: Type[_T], object_id: Union[interactions.Snowflake, Tuple[interactions.Snowflake, interactions.Snowflake]] = None) -> _T:
+        object = type(**data, _client=self._http)
+        self.storages[type].merge(object, object_id)
+        return object
+
+    def get_guild(self, guild_id: interactions.Snowflake) -> interactions.Guild:
+        return self._get_object(interactions.Guild, guild_id)
+
+    def add_guild(self, data: dict) -> interactions.Guild:
+        return self._add_object(data, interactions.Guild)
+
+    def get_channel(self, channel_id: interactions.Snowflake):
+        return self._get_object(interactions.Channel, channel_id)
+
+    def add_channel(self, data: dict, guild_id: interactions.Snowflake) -> interactions.Channel:
+        channel = self._add_object(data, interactions.Channel)
+
+        if guild := self.get_guild(guild_id):
+            guild._channel_ids.add(channel.id)
+
+        return channel
+
+    def add_channels(self, data: List[dict], guild_id: interactions.Snowflake):
+        return [
+            self.add_channel(channel, guild_id)
+            for channel in data
+        ]
+
+    def get_thread(self, thread_id: interactions.Snowflake) -> interactions.Thread:
+        return self._get_object(interactions.Thread, thread_id)
+
+    def add_thread(self, data: dict, guild_id: interactions.Snowflake) -> interactions.Thread:
+        thread = self._add_object(data, interactions.Thread)
+
+        if guild := self.get_guild(guild_id):
+            guild._thread_ids.add(thread.id)
+
+        return thread
+
+    def add_threads(self, data: List[dict], guild_id: interactions.Snowflake) -> List[interactions.Thread]:
+        return [
+            self.add_thread(thread, guild_id)
+            for thread in data
+        ]
+
+    def get_member(self, guild_id: interactions.Snowflake, member_id: interactions.Snowflake) -> interactions.Member:
+        return self._get_object(interactions.Member, object_id=(guild_id, member_id))
+
+    def add_member(self, data: dict, guild_id: interactions.Snowflake) -> interactions.Member:
+        _id = (guild_id, interactions.Snowflake(data["user"]["id"]))
+        member = self._add_object(data, interactions.Member, object_id=_id)
+
+        if guild := self.get_guild(guild_id):
+            guild._member_ids.add(member.id)
+
+        return member
+
+    def add_members(self, data: List[dict], guild_id: interactions.Snowflake) -> List[interactions.Member]:
+        return [
+            self.add_member(member, guild_id)
+            for member in data
+        ]
+
+    def get_role(self, role_id: interactions.Snowflake) -> interactions.Role:
+        return self._get_object(interactions.Role, role_id)
+
+    def add_role(self, data: dict, guild_id: interactions.Snowflake) -> interactions.Role:
+        role = self._add_object(data, interactions.Role)
+
+        if guild := self.get_guild(guild_id):
+            guild._role_ids.add(role.id)
+
+        return role
+
+    def add_roles(self, data: List[dict], guild_id: interactions.Snowflake) -> List[interactions.Role]:
+        return [
+            self.add_role(role, guild_id)
+            for role in data
+        ]
+
+    def get_emoji(self, emoji_id: interactions.Snowflake) -> interactions.Emoji:
+        return self._get_object(interactions.Emoji, object_id=emoji_id)
+
+    def add_emoji(self, data: dict, guild_id: interactions.Snowflake) -> interactions.Emoji:
+        return self._add_object(data, interactions.Emoji, guild_id)
+
+    def add_emojis(self, data: List[dict], guild_id: interactions.Snowflake) -> List[interactions.Emoji]:
+        return [
+            self.add_emoji(emoji, guild_id)
+            for emoji in data
+        ]
+
+    def get_sticker(self, sticker_id: interactions.Snowflake) -> interactions.Sticker:
+        return self._get_object(interactions.Sticker, object_id=sticker_id)
+
+    def add_sticker(self, data: dict, guild_id: interactions.Snowflake) -> interactions.Sticker:
+        return self._add_object(data, interactions.Sticker, guild_id)
+
+    def add_stickers(self, data: List[dict], guild_id: interactions.Snowflake) -> List[interactions.Sticker]:
+        return [
+            self.add_sticker(sticker, guild_id)
+            for sticker in data
+        ]
