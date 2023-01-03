@@ -265,36 +265,39 @@ class AsyncMembersIterator(DiscordPaginationIterator):
         if self.maximum == limit:
             self.__stop = True
 
-        members = await self._client.get_list_of_members(
+        raw_members = await self._client.get_list_of_members(
             guild_id=self.object_id, after=self.after, limit=limit
         )
-        self.after = int(members[-1]["user"]["id"])
+        self.after = int(raw_members[-1]["user"]["id"])
 
-        if len(members) < 1000:
+        if len(raw_members) < 1000:
             # already all messages resolved with one operation
             self.__stop = True
 
         self.object_count += limit
-        self.objects = [self._client.cache[Member].get(member["id"]) for member in members]
-        member_ids = self._client.cache[Guild].get(Snowflake(self.object_id))._member_ids
-        [member_ids.add(member.id) for member in self.objects]
+
+        guild_id = Snowflake(self.object_id)
+        members = self._client.cache.add_members(raw_members, guild_id)
+
+        self.objects = [*members]
 
     async def get_objects(self) -> None:
         limit = min(500, self.maximum - self.object_count)
-        members = await self._client.get_list_of_members(
+        raw_members = await self._client.get_list_of_members(
             guild_id=self.object_id, after=self.after, limit=limit
         )
-        self.after = int(members[-1]["user"]["id"])
+        self.after = int(raw_members[-1]["user"]["id"])
 
-        if len(members) < limit or limit == self.maximum - self.object_count:
+        if len(raw_members) < limit or limit == self.maximum - self.object_count:
             # end of messages reached again
             self.__stop = True
 
         self.object_count += limit
 
-        self.objects.extend([self._client.cache[Member].get(member["id"]) for member in members])
-        member_ids = self._client.cache[Guild].get(Snowflake(self.object_id))._member_ids
-        [member_ids.add(member.id) for member in self.objects]
+        guild_id = Snowflake(self.object_id)
+        members = self._client.cache.add_members(raw_members, guild_id)
+
+        self.objects.extend(members)
 
     async def flatten(self) -> List[Member]:
         """Returns all remaining items of the iterator as list."""
@@ -443,97 +446,59 @@ class Guild(ClientSerializerMixin, IDMixin):
     features: List[str] = field()
     premium_progress_bar_enabled: Optional[bool] = field(default=None)
 
-    _member_ids: Set[Snowflake] = field(factory=list)
-    _role_ids: Set[Snowflake] = field(factory=list)
-    _channel_ids: Set[Snowflake] = field(factory=list)
-    _thread_ids: Set[Snowflake] = field(factory=list)
-    _emoji_ids: Set[Snowflake] = field(factory=list)
-    _sticker_ids: Set[Snowflake] = field(factory=list)
+    _member_ids: Set[Snowflake] = field(factory=set)
+    _role_ids: Set[Snowflake] = field(factory=set)
+    _channel_ids: Set[Snowflake] = field(factory=set)
+    _thread_ids: Set[Snowflake] = field(factory=set)
+    _emoji_ids: Set[Snowflake] = field(factory=set)
+    _sticker_ids: Set[Snowflake] = field(factory=set)
 
     def __attrs_post_init__(self):
         if not self._client:
             return
         cache = self._client.cache
 
-        if members := self._extras.get("members"):
-            cache[Member].update(
-                {
-                    (self.id, Snowflake(member["user"]["id"])): Member(
-                        **member, _client=self._client
-                    )
-                    for member in members
-                }
-            )
-            self._member_ids = {Snowflake(member["user"]["id"]) for member in members}
+        if members := self._extras.pop("members", None):
+            cache.add_members(members, self.id)
 
-        if roles := self._extras.get("roles"):
-            cache[Role].update(
-                {Snowflake(role["id"]): Role(**role, _client=self._client) for role in roles}
-            )
-            self._role_ids = {Snowflake(role["id"]) for role in roles}
+        if roles := self._extras.pop("roles", None):
+            cache.add_roles(roles, self.id)
 
-        if channels := self._extras.get("channels"):
-            cache[Channel].update(
-                {
-                    Snowflake(channel["id"]): Channel(**channel, _client=self._client)
-                    for channel in channels
-                }
-            )
-            self._channel_ids = {Snowflake(channel["id"]) for channel in channels}
+        if channels := self._extras.pop("channels", None):
+            cache.add_channels(channels, self.id)
 
-        if threads := self._extras.get("threads"):
-            cache[Thread].update(
-                {
-                    Snowflake(thread["id"]): Thread(**thread, _client=self._client)
-                    for thread in threads
-                }
-            )
-            self._thread_ids = {Snowflake(thread["id"]) for thread in threads}
+        if threads := self._extras.pop("threads", None):
+            cache.add_threads(threads, self.id)
 
-        if emojis := self._extras.get("emojis"):
-            cache[Emoji].update(
-                {Snowflake(emoji["id"]): Emoji(**emoji, _client=self._client) for emoji in emojis}
-            )
-            self._emoji_ids = {Snowflake(emoji["id"]) for emoji in emojis}
+        if emojis := self._extras.pop("emojis", None):
+            cache.add_emojis(emojis, self.id)
 
-        if stickers := self._extras.get("stickers"):
-            cache[Sticker].update(
-                {
-                    Snowflake(sticker["id"]): Sticker(**sticker, _client=self._client)
-                    for sticker in stickers
-                }
-            )
-            self._sticker_ids = {Snowflake(sticker["id"]) for sticker in stickers}
+        if stickers := self._extras.pop("stickers", None):
+            cache.add_stickers(stickers, self.id)
 
     @property
     def members(self) -> List[Member]:
-        cache = self._client.cache[Member]
-        return [cache.get(self.id, id) for id in self._member_ids]
+        return [self.cache.get_member(self.id, id) for id in self._member_ids]
 
     @property
     def roles(self) -> List[Role]:
-        cache = self._client.cache[Role]
-        return [cache.get(id) for id in self._role_ids]
+        return [self.cache.get_role(id) for id in self._role_ids]
 
     @property
     def channel(self) -> List[Channel]:
-        cache = self._client.cache[Channel]
-        return [cache.get(id) for id in self._channel_ids]
+        return [self.cache.get_channel(id) for id in self._channel_ids]
 
     @property
     def threads(self) -> List[Thread]:
-        cache = self._client.cache[Thread]
-        return [cache.get(id) for id in self._thread_ids]
+        return [self.cache.get_thread(id) for id in self._thread_ids]
 
     @property
     def emojis(self) -> List[Emoji]:
-        cache = self._client.cache[Emoji]
-        return [cache.get(id) for id in self._emoji_ids]
+        return [self.cache.get_emoji(id) for id in self._emoji_ids]
 
     @property
     def stickers(self) -> List[Sticker]:
-        cache = self._client.cache[Sticker]
-        return [cache.get(id) for id in self._sticker_ids]
+        return [self.cache.get_sticker(id) for id in self._sticker_ids]
 
     @property
     def voice_states(self) -> List["VoiceState"]:
@@ -550,11 +515,10 @@ class Guild(ClientSerializerMixin, IDMixin):
 
         from .gw import VoiceState
 
-        states: List[VoiceState] = []
-
-        data = self._client.cache[VoiceState].values.values()
-        states.extend(state for state in data if state.guild_id == self.id)
-        return states
+        return [
+            state for state in self.cache[VoiceState].values.values()
+            if state.guild_id == self.id
+        ]
 
     @property
     def mapped_voice_states(self) -> Dict[int, List["VoiceState"]]:
@@ -624,12 +588,14 @@ class Guild(ClientSerializerMixin, IDMixin):
             )
 
         _member_id = int(member_id.id) if isinstance(member_id, Member) else int(member_id)
+
         await self._client.create_guild_ban(
             guild_id=int(self.id),
             user_id=_member_id,
             reason=reason,
             delete_message_seconds=seconds,
         )
+        self.cache[Member].pop((self.id, Snowflake(_member_id)))
 
     async def remove_ban(
         self,
@@ -646,6 +612,7 @@ class Guild(ClientSerializerMixin, IDMixin):
         """
         if not self._client:
             raise LibraryException(code=13)
+
         await self._client.remove_guild_ban(
             guild_id=int(self.id),
             user_id=user_id,
@@ -669,11 +636,14 @@ class Guild(ClientSerializerMixin, IDMixin):
             raise LibraryException(code=13)
 
         _member_id = int(member_id.id) if isinstance(member_id, Member) else int(member_id)
+
         await self._client.create_guild_kick(
             guild_id=int(self.id),
             user_id=_member_id,
             reason=reason,
         )
+
+        self.cache[Member].pop((self.id, Snowflake(_member_id)))
 
     async def add_member_role(
         self,
@@ -703,7 +673,7 @@ class Guild(ClientSerializerMixin, IDMixin):
             reason=reason,
         )
 
-        member = self._client.cache[Member].get(Snowflake(_member_id))
+        member = self.cache.get_member(self.id, Snowflake(_member_id))
         if member:
             member.roles.append(_role_id)
 
@@ -735,7 +705,7 @@ class Guild(ClientSerializerMixin, IDMixin):
             reason=reason,
         )
 
-        member = self._client.cache[Member].get(Snowflake(_member_id))
+        member = self.cache.get_member(self.id, Snowflake(_member_id))
         if member:
             member.roles.remove(_role_id)
 
@@ -787,7 +757,7 @@ class Guild(ClientSerializerMixin, IDMixin):
             payload=payload,
         )
 
-        return self._client.cache[Role].get(Snowflake(res["id"]))
+        return self.cache.add_role(res, self.id)
 
     async def get_member(
         self,
@@ -805,11 +775,12 @@ class Guild(ClientSerializerMixin, IDMixin):
         if not self._client:
             raise LibraryException(code=13)
 
-        await self._client.get_member(
+        res = await self._client.get_member(
             guild_id=int(self.id),
             member_id=int(member_id),
         )
-        return self._client.cache[Member].get(Snowflake(member_id))
+
+        return self.cache.add_member(res, self.id)
 
     async def delete_channel(
         self,
@@ -826,7 +797,11 @@ class Guild(ClientSerializerMixin, IDMixin):
             raise LibraryException(code=13)
 
         _channel_id = int(channel_id.id) if isinstance(channel_id, Channel) else int(channel_id)
+
         await self._client.delete_channel(_channel_id)
+
+        self.cache[Channel].pop(Snowflake(_channel_id))
+        self._channel_ids.remove(Snowflake(_channel_id))
 
     async def delete_role(
         self,
@@ -851,6 +826,8 @@ class Guild(ClientSerializerMixin, IDMixin):
             role_id=_role_id,
             reason=reason,
         )
+
+        self.cache[Role].pop(Snowflake(_role_id))
 
     async def modify_role(
         self,
@@ -903,14 +880,14 @@ class Guild(ClientSerializerMixin, IDMixin):
         if unicode_emoji is not MISSING:
             payload["unicode_emoji"] = unicode_emoji
 
-        await self._client.modify_guild_role(
+        res = await self._client.modify_guild_role(
             guild_id=int(self.id),
             role_id=role_id,
             payload=payload,
             reason=reason,
         )
 
-        return self._client.cache[Role].get(Snowflake(role_id))
+        return self.cache.add_role(res, self.id)
 
     async def create_thread(
         self,
@@ -956,6 +933,7 @@ class Guild(ClientSerializerMixin, IDMixin):
             )
         )  # work around Message import
         _channel_id = int(channel_id.id) if isinstance(channel_id, Channel) else int(channel_id)
+
         res = await self._client.create_thread(
             channel_id=_channel_id,
             thread_type=type if isinstance(type, int) else type.value,
@@ -966,7 +944,7 @@ class Guild(ClientSerializerMixin, IDMixin):
             reason=reason,
         )
 
-        return self._client.cache[Thread].get(Snowflake(res["id"]))
+        return self.cache.add_thread(res, self.id)
 
     async def create_channel(
         self,
@@ -1052,10 +1030,7 @@ class Guild(ClientSerializerMixin, IDMixin):
             payload=payload,
         )
 
-        channel = Channel(**res, _client=self._client)
-        self._client.cache[Channel].add(channel)
-
-        return channel
+        return self.cache.add_channel(res, self.id)
 
     async def clone_channel(self, channel_id: Union[int, Snowflake, Channel]) -> Channel:
         """
@@ -1171,11 +1146,7 @@ class Guild(ClientSerializerMixin, IDMixin):
             payload=payload,
         )
 
-        channel = Channel(**res, _client=self._client)
-
-        self._client.cache[Channel].merge(channel)
-
-        return channel
+        return self.cache.add_channel(res, self.id)
 
     async def modify_member(
         self,
@@ -1227,14 +1198,14 @@ class Guild(ClientSerializerMixin, IDMixin):
 
         _member_id = int(member_id.id) if isinstance(member_id, Member) else int(member_id)
 
-        await self._client.modify_member(
+        res = await self._client.modify_member(
             user_id=_member_id,
             guild_id=int(self.id),
             payload=payload,
             reason=reason,
         )
 
-        return self._client.cache[Member].get(Snowflake(_member_id))
+        return self.cache.add_member(res, self.id)
 
     async def get_preview(self) -> "GuildPreview":
         """
@@ -1407,11 +1378,13 @@ class Guild(ClientSerializerMixin, IDMixin):
         if banner is not MISSING:
             payload["banner"] = banner.data if isinstance(banner, Image) else banner
 
-        await self._client.modify_guild(
+        res = await self._client.modify_guild(
             guild_id=int(self.id),
             payload=payload,
             reason=reason,
         )
+
+        self.update(res)
 
         return self
 
@@ -1753,7 +1726,7 @@ class Guild(ClientSerializerMixin, IDMixin):
         if not self._client:
             raise LibraryException(code=13)
         res = await self._client.get_scheduled_events(
-            guild_id=self.id, with_user_count=with_user_count
+            guild_id=int(self.id), with_user_count=with_user_count
         )
         return [ScheduledEvents(**scheduled_event) for scheduled_event in res] if res else []
 
@@ -1862,9 +1835,7 @@ class Guild(ClientSerializerMixin, IDMixin):
 
         res = await self._client.get_all_channels(int(self.id))
 
-        [self._channel_ids.add(Snowflake(channel["id"])) for channel in res]
-
-        return self.channels
+        return self.cache.add_channels(res, self.id)
 
     async def get_all_active_threads(self) -> List[Channel]:
         """
@@ -1880,7 +1851,7 @@ class Guild(ClientSerializerMixin, IDMixin):
 
         res = await self._client.list_active_threads(int(self.id))
 
-        threads = [Thread(**thread, _client=self._client) for thread in res["threads"]]
+        threads = self.cache.add_threads(res["threads"], self.id)
         members = [ThreadMember(**member, _client=self._client) for member in res["members"]]
 
         for member in members:
@@ -1905,13 +1876,11 @@ class Guild(ClientSerializerMixin, IDMixin):
 
         res = await self._client.get_all_roles(int(self.id))
 
-        [self._role_ids.add(Snowflake(role["id"])) for role in res]
-
-        return self.roles
+        return self.cache.add_roles(res, self.id)
 
     async def get_role(
         self,
-        role_id: Union[Snowflake, int],
+        role_id: Union[Snowflake, int, str],
     ) -> Role:
         """
         .. versionadded:: 4.2.0
@@ -1922,17 +1891,18 @@ class Guild(ClientSerializerMixin, IDMixin):
         :return: The role as object
         :rtype: Role
         """
-
-        role = self._client.cache[Role].get(Snowflake(role_id))
-        if role is not None:
-            return role
-
         if not self._client:
             raise LibraryException(code=13)
 
+        role_id = Snowflake(role_id)
+
+        role = self.cache.get_role(role_id)
+        if role is not None:
+            return role
+
         await self.get_all_roles()
 
-        role = self._client.cache[Role].get(Snowflake(role_id))
+        role = self.cache.get_role(role_id)
         if role is not None:
             return role
 
@@ -1942,7 +1912,7 @@ class Guild(ClientSerializerMixin, IDMixin):
 
     async def modify_role_position(
         self,
-        role_id: Union[Role, int],
+        role_id: Union[Role, Snowflake, int, str],
         position: int,
         reason: Optional[str] = None,
     ) -> List[Role]:
@@ -1996,9 +1966,7 @@ class Guild(ClientSerializerMixin, IDMixin):
             reason=reason,
         )
 
-        [self._role_ids.add(Snowflake(role["id"])) for role in res]
-
-        return self.roles
+        return self.cache.add_roles(res, self.id)
 
     async def get_bans(
         self,
@@ -2157,9 +2125,7 @@ class Guild(ClientSerializerMixin, IDMixin):
 
         res = await self._client.get_guild_emoji(guild_id=int(self.id), emoji_id=emoji_id)
 
-        self._role_ids.add(Snowflake(emoji_id))
-
-        return self._client.cache[Emoji].get(Snowflake(emoji_id))
+        return self.cache.add_emoji(res, self.id)
 
     async def get_all_emoji(self) -> List[Emoji]:
         """
@@ -2175,9 +2141,7 @@ class Guild(ClientSerializerMixin, IDMixin):
 
         res = await self._client.get_all_emoji(guild_id=int(self.id))
 
-        [self._role_ids.add(Snowflake(emoji["id"])) for emoji in res]
-
-        return self.emojis
+        return self.cache.add_emojis(res, self.id)
 
     async def create_emoji(
         self,
@@ -2207,16 +2171,14 @@ class Guild(ClientSerializerMixin, IDMixin):
         }
 
         if roles is not MISSING:
-            _roles = [role.id if isinstance(role, Role) else role for role in roles]
+            _roles = [int(role.id if isinstance(role, Role) else role) for role in roles]
             payload["roles"] = _roles
 
         res = await self._client.create_guild_emoji(
             guild_id=int(self.id), payload=payload, reason=reason
         )
 
-        self._emoji_ids.add(Snowflake(res["id"]))
-
-        return self._client.cache[Emoji].get(Snowflake(res["id"]))
+        return self.cache.add_emoji(res, self.id)
 
     async def modify_emoji(
         self,
@@ -2254,20 +2216,11 @@ class Guild(ClientSerializerMixin, IDMixin):
             guild_id=int(self.id), emoji_id=emoji_id, payload=payload, reason=reason
         )
 
-        _emoji = Emoji(**res, _client=self._client)
-        if self.emojis is None:
-            self.emojis = []
-        for index, item in enumerate(self.emojis):
-            if item.id == emoji_id:
-                self.roles[index] = _emoji
-                break
-        else:
-            self.roles.append(_emoji)
-        return _emoji
+        return self.cache.add_emoji(res, self.id)
 
     async def delete_emoji(
         self,
-        emoji: Union[Emoji, int],
+        emoji: Union[Emoji, int, str, Snowflake],
         reason: Optional[str] = None,
     ) -> None:
         """
@@ -2275,7 +2228,7 @@ class Guild(ClientSerializerMixin, IDMixin):
 
         Deletes an emoji of the guild.
 
-        :param Union[Emoji, int] emoji: The emoji or the id of the emoji to delete
+        :param Union[Emoji, int, str, Snowflake] emoji: The emoji or the id of the emoji to delete
         :param Optional[str] reason: The reason of the deletion
         """
         if not self._client:
@@ -2288,8 +2241,10 @@ class Guild(ClientSerializerMixin, IDMixin):
             emoji_id=emoji_id,
             reason=reason,
         )
+        _emoji_id = Snowflake(emoji_id)
 
-        self._emoji_ids.remove(Snowflake(emoji_id))
+        self.cache[Emoji].pop(_emoji_id)
+        self._emoji_ids.remove(_emoji_id)
 
     async def get_stickers(self) -> Optional[List[Sticker]]:
         """
@@ -2305,9 +2260,7 @@ class Guild(ClientSerializerMixin, IDMixin):
 
         res = await self._client.list_guild_stickers(guild_id=int(self.id))
 
-        [self._sticker_ids.add(Snowflake(sticker["id"])) for sticker in res]
-
-        return self.stickers
+        return self.cache.add_stickers(res, self.id)
 
     async def get_nitro_sticker_packs(self) -> List[StickerPack]:
         """
@@ -2362,10 +2315,7 @@ class Guild(ClientSerializerMixin, IDMixin):
         res = await self._client.create_guild_sticker(
             payload=payload, file=file, guild_id=int(self.id), reason=reason
         )
-        sticker_id = Snowflake(res["id"])
-
-        self._sticker_ids.add(sticker_id)
-        return self._client.cache[Sticker].get(sticker_id)
+        return self.cache.add_sticker(res, self.id)
 
     async def modify_sticker(
         self,
@@ -2398,10 +2348,10 @@ class Guild(ClientSerializerMixin, IDMixin):
         if description is not MISSING:
             payload["description"] = description
 
-        await self._client.modify_guild_sticker(
+        res = await self._client.modify_guild_sticker(
             payload=payload, guild_id=int(self.id), sticker_id=_id, reason=reason
         )
-        return self._client.cache[Sticker].get(Snowflake(sticker_id))
+        return self.cache.add_sticker(res, self.id)
 
     async def delete_sticker(
         self,
@@ -2424,6 +2374,11 @@ class Guild(ClientSerializerMixin, IDMixin):
         await self._client.delete_guild_sticker(
             guild_id=int(self.id), sticker_id=_id, reason=reason
         )
+
+        _sticker_id = Snowflake(_id)
+
+        self.cache[Sticker].pop(_sticker_id)
+        self._sticker_ids.remove(_sticker_id)
 
     async def get_list_of_members(
         self,
@@ -2452,9 +2407,7 @@ class Guild(ClientSerializerMixin, IDMixin):
             guild_id=int(self.id), limit=limit, after=_after
         )
 
-        [self._member_ids.add(Snowflake(member["id"])) for member in res]
-
-        return [self._client.cache[Member].get(Snowflake(member["id"])) for member in res]
+        return self.cache.add_members(res, self.id)
 
     async def search_members(self, query: str, limit: Optional[int] = 1) -> List[Member]:
         """
@@ -2473,9 +2426,7 @@ class Guild(ClientSerializerMixin, IDMixin):
             guild_id=int(self.id), query=query, limit=limit
         )
 
-        [self._member_ids.add(Snowflake(member["id"])) for member in res]
-
-        return [self._client.cache[Member].get(Snowflake(member["id"])) for member in res]
+        return self.cache.add_members(res, self.id)
 
     async def get_all_members(self) -> List[Member]:
         """
@@ -2511,9 +2462,7 @@ class Guild(ClientSerializerMixin, IDMixin):
                 )
         _all_members.extend(_members)
 
-        [self._member_ids.add(Snowflake(member["id"])) for member in _all_members]
-
-        return self.members
+        return self.cache.add_members(_all_members, self.id)
 
     def get_members(
         self,
@@ -2971,16 +2920,9 @@ class Guild(ClientSerializerMixin, IDMixin):
         if new_nick is MISSING:
             raise LibraryException(code=12, message="new nick name must either a string or `None`")
 
-        _member = Member(
-            **await self._client.modify_self_nick_in_guild(int(self.id), new_nick),
-            _client=self._client,
-        )
-        member_id = Snowflake(_member.id)
+        res = await self._client.modify_self_nick_in_guild(int(self.id), new_nick)
 
-        self._client.cache[Member].merge(_member, id=(self.id, member_id))
-        self._member_ids.add(member_id)
-
-        return _member
+        return self.cache.add_member(res, self.id)
 
     @property
     def icon_url(self) -> Optional[str]:

@@ -87,7 +87,10 @@ class Emoji(ClientSerializerMixin):
         _guild_id = int(guild_id) if isinstance(guild_id, (int, Snowflake)) else int(guild_id.id)
 
         res = await client.get_guild_emoji(guild_id=_guild_id, emoji_id=int(emoji_id))
-        return cls(**res, _client=client)
+        emoji = cls(**res, _client=client)
+        client.cache[Emoji].merge(emoji)
+
+        return emoji
 
     @classmethod
     async def get_all_of_guild(
@@ -109,8 +112,8 @@ class Emoji(ClientSerializerMixin):
         _guild_id = int(guild_id) if isinstance(guild_id, (int, Snowflake)) else int(guild_id.id)
 
         res = await client.get_all_emoji(guild_id=_guild_id)
-        # TODO: YET THIS
-        return [cls(**emoji, _client=client) for emoji in res]
+
+        return client.cache.add_emojis(res, Snowflake(_guild_id))
 
     async def modify(
         self,
@@ -170,9 +173,13 @@ class Emoji(ClientSerializerMixin):
 
         _guild_id = int(guild_id) if isinstance(guild_id, (int, Snowflake)) else int(guild_id.id)
 
-        return await self._client.delete_guild_emoji(
+        await self._client.delete_guild_emoji(
             guild_id=_guild_id, emoji_id=int(self.id), reason=reason
         )
+        self.cache[Emoji].pop(self.id)
+
+        if guild := self.cache.get_guild(Snowflake(_guild_id)):
+            guild._emoji_ids.remove(self.id)
 
     @property
     def url(self) -> str:
