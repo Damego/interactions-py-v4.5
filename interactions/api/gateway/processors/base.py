@@ -47,6 +47,10 @@ class BaseProcessor:
         return before, cached_object
 
     def _delete_event(
-        self, model: Type[T], *, id: Union[Tuple[Snowflake, Snowflake], Snowflake]
-    ) -> Optional[T]:
-        return self._cache[model].pop(id)
+        self, model: Type[T], data: dict, *, id: Union[Tuple[Snowflake, Snowflake], Snowflake]
+    ) -> T:
+        obj = self._cache[model].pop(id)
+        if obj is None:
+            obj = model(**data)
+
+        return obj

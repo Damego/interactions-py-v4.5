@@ -8,11 +8,7 @@ from .base import BaseProcessor
 class MemberProcessor(BaseProcessor):
     def guild_member_add(self, data: dict) -> tuple:
         guild_id = Snowflake(data["guild_id"])
-        id = guild_id, Snowflake(data["user"]["id"])
-
-        member = self._create_event(Member, data, id=id)
-        guild = self._cache[Guild].get(guild_id)
-        guild._member_ids.add(member.id)
+        member = self._cache.add_member(data, guild_id)
 
         return (member,)
 
@@ -22,21 +18,18 @@ class MemberProcessor(BaseProcessor):
 
         before, after = self._update_event(Member, data, id=id)
 
-        guild = self._cache[Guild].get(guild_id)
-        guild._member_ids.add(after.id)
+        if guild := self._cache.get_guild(guild_id):
+            guild._member_ids.add(after.id)
 
         return before, after
 
     def guild_member_remove(self, data: dict) -> tuple:
         guild_id = Snowflake(data["guild_id"])
-        id = guild_id, Snowflake(data["user"]["id"])
+        user_id = Snowflake(data["user"]["id"])
 
-        member = self._delete_event(Member, id=id)
+        member = self._cache.remove_member(user_id, guild_id)
         if member is None:
             member = Member(**data)
-
-        guild = self._cache[Guild].get(guild_id)
-        guild._member_ids.remove(member.id)
 
         return (member,)
 
@@ -47,7 +40,7 @@ class MemberProcessor(BaseProcessor):
         guild = self._cache[Guild].get(guild_members.guild_id)
 
         for member in guild_members.members:
-            cache.merge(member, id=(guild_members.guild_id, member.id))
+            cache.add(member, id=(guild_members.guild_id, member.id))  # With `merge` method it will take a long time
             guild._member_ids.add(member.id)
 
         return (guild_members,)

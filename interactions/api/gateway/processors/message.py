@@ -13,17 +13,14 @@ class MessageProcessor(BaseProcessor):
 
     def message_delete(self, data: dict) -> tuple:
         message = self._delete_event(Message, id=Snowflake(data["id"]))
-        if message is None:
-            message = Message(**data)
 
         return (message,)
 
     def message_delete_bulk(self, data: dict) -> tuple:
         message_delete = events.MessageDelete(**data)
-        message_ids = message_delete.ids
         cache = self._cache[Message]
 
-        [cache.pop(message_id) for message_id in message_ids]
+        [cache.pop(message_id) for message_id in message_delete.ids]
 
         return (message_delete,)
 

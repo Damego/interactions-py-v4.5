@@ -9,8 +9,7 @@ from .base import BaseProcessor
 
 class GuildProcessor(BaseProcessor):
     def guild_create(self, data: dict) -> tuple:
-        guild = Guild(**data)
-        self._cache[Guild].add(guild)
+        guild = self._cache.add_guild(data)
 
         return (guild,)
 
@@ -31,20 +30,22 @@ class GuildProcessor(BaseProcessor):
     def guild_emojis_update(self, data: dict) -> tuple:
         guild_emojis = events.GuildEmojis(**data)
 
-        guild = self._cache[Guild].get(guild_emojis.guild_id)
+        guild = self._cache.get_guild(guild_emojis.guild_id)
 
-        [guild._emoji_ids.add(Snowflake(emoji.id)) for emoji in guild_emojis.emojis]
-        [self._cache[Emoji].merge(emoji) for emoji in guild_emojis.emojis]
+        for emoji in guild_emojis.emojis:
+            guild._emoji_ids.add(emoji.id)
+            self._cache[Emoji].merge(emoji)
 
         return (guild_emojis,)
 
     def guild_stickers_update(self, data: dict) -> tuple:
         guild_stickers = events.GuildStickers(**data)
 
-        guild = self._cache[Guild].get(guild_stickers.guild_id)
+        guild = self._cache.get_guild(guild_stickers.guild_id)
 
-        [guild._sticker_ids.add(Snowflake(sticker.id)) for sticker in guild_stickers.stickers]
-        [self._cache[Sticker].merge(sticker) for sticker in guild_stickers.stickers]
+        for sticker in guild_stickers.stickers:
+            guild._sticker_ids.add(sticker.id)
+            self._cache[Sticker].merge(sticker)
 
         return (guild_stickers,)
 
@@ -80,7 +81,8 @@ class GuildProcessor(BaseProcessor):
         return (Invite(**data),)
 
     def guild_role_create(self, data: dict) -> tuple:
-        role = self._create_event(Role, data["role"])
+        guild_id = Snowflake(data["guild_id"])
+        role = self._cache.add_role(data["role"], guild_id)
 
         return (role,)
 
