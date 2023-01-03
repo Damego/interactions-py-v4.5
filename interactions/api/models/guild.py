@@ -516,8 +516,7 @@ class Guild(ClientSerializerMixin, IDMixin):
         from .gw import VoiceState
 
         return [
-            state for state in self.cache[VoiceState].values.values()
-            if state.guild_id == self.id
+            state for state in self.cache[VoiceState].values.values() if state.guild_id == self.id
         ]
 
     @property

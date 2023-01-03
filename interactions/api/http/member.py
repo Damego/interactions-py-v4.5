@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING, List, Optional
 
-from ..models.guild import Guild
 from ..models.member import Member
 from ..models.misc import Snowflake
 from .request import _Request

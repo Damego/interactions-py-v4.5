@@ -1,8 +1,5 @@
 from typing import TYPE_CHECKING, List, Optional
 
-from ..models.emoji import Emoji
-from ..models.guild import Guild
-from ..models.misc import Snowflake
 from .request import _Request
 from .route import Route
 

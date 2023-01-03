@@ -1,9 +1,7 @@
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from urllib.parse import quote
 
-from ..models.channel import Channel
 from ..models.guild import Guild
-from ..models.member import Member
 from ..models.misc import Snowflake
 from ..models.role import Role
 from .request import _Request
@@ -406,9 +404,7 @@ class GuildRequest:
         :param guild_id: Guild ID snowflake
         :return: An array of Role objects as dictionaries.
         """
-        return await self._req.request(
-            Route("GET", "/guilds/{guild_id}/roles", guild_id=guild_id)
-        )
+        return await self._req.request(Route("GET", "/guilds/{guild_id}/roles", guild_id=guild_id))
 
     async def create_guild_role(
         self, guild_id: int, payload: dict, reason: Optional[str] = None

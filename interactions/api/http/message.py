@@ -112,7 +112,9 @@ class MessageRequest:
         :param message_id: the id of the message
         :return: message if it exists.
         """
-        return await self._req.request(Route("GET", f"/channels/{channel_id}/messages/{message_id}"))
+        return await self._req.request(
+            Route("GET", f"/channels/{channel_id}/messages/{message_id}")
+        )
 
     async def delete_message(
         self, channel_id: int, message_id: int, reason: Optional[str] = None

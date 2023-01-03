@@ -1,5 +1,5 @@
 from asyncio import Task, create_task, get_running_loop, sleep
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from inspect import isawaitable
 from math import inf
 from typing import (
@@ -31,7 +31,7 @@ from ...utils.missing import MISSING
 from ...utils.utils import search_iterable
 from ..error import LibraryException
 from .emoji import Emoji
-from .flags import MessageFlags, Permissions
+from .flags import Permissions
 from .misc import AllowedMentions, File, IDMixin, Overwrite, Snowflake
 from .role import Role
 from .user import User
@@ -596,8 +596,7 @@ class Channel(ClientSerializerMixin, Messageable, IDMixin):
         from .gw import VoiceState
 
         return [
-            state for state in self.cache[VoiceState].values.values()
-            if state.channel_id == self.id
+            state for state in self.cache[VoiceState].values.values() if state.channel_id == self.id
         ]
 
     @property
