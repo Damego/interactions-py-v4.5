@@ -594,7 +594,7 @@ class Guild(ClientSerializerMixin, IDMixin):
             reason=reason,
             delete_message_seconds=seconds,
         )
-        self.cache[Member].pop((self.id, Snowflake(_member_id)))
+        self.cache.remove_member(Snowflake(_member_id), self.id)
 
     async def remove_ban(
         self,
@@ -642,7 +642,7 @@ class Guild(ClientSerializerMixin, IDMixin):
             reason=reason,
         )
 
-        self.cache[Member].pop((self.id, Snowflake(_member_id)))
+        self.cache.remove_member(Snowflake(_member_id), self.id)
 
     async def add_member_role(
         self,
@@ -799,8 +799,7 @@ class Guild(ClientSerializerMixin, IDMixin):
 
         await self._client.delete_channel(_channel_id)
 
-        self.cache[Channel].pop(Snowflake(_channel_id))
-        self._channel_ids.remove(Snowflake(_channel_id))
+        self.cache.remove_channel(Snowflake(_channel_id), self.id)
 
     async def delete_role(
         self,
@@ -826,7 +825,7 @@ class Guild(ClientSerializerMixin, IDMixin):
             reason=reason,
         )
 
-        self.cache[Role].pop(Snowflake(_role_id))
+        self.cache.remove_role(Snowflake(_role_id), self.id)
 
     async def modify_role(
         self,
@@ -2240,10 +2239,8 @@ class Guild(ClientSerializerMixin, IDMixin):
             emoji_id=emoji_id,
             reason=reason,
         )
-        _emoji_id = Snowflake(emoji_id)
 
-        self.cache[Emoji].pop(_emoji_id)
-        self._emoji_ids.remove(_emoji_id)
+        self.cache.remove_emoji(Snowflake(emoji_id), self.id)
 
     async def get_stickers(self) -> Optional[List[Sticker]]:
         """
@@ -2374,10 +2371,8 @@ class Guild(ClientSerializerMixin, IDMixin):
             guild_id=int(self.id), sticker_id=_id, reason=reason
         )
 
-        _sticker_id = Snowflake(_id)
+        self.cache.remove_sticker(Snowflake(_id), self.id)
 
-        self.cache[Sticker].pop(_sticker_id)
-        self._sticker_ids.remove(_sticker_id)
 
     async def get_list_of_members(
         self,

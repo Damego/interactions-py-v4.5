@@ -176,10 +176,7 @@ class Emoji(ClientSerializerMixin):
         await self._client.delete_guild_emoji(
             guild_id=_guild_id, emoji_id=int(self.id), reason=reason
         )
-        self.cache[Emoji].pop(self.id)
-
-        if guild := self.cache.get_guild(Snowflake(_guild_id)):
-            guild._emoji_ids.remove(self.id)
+        self.cache.remove_emoji(self.id, Snowflake(_guild_id))
 
     @property
     def url(self) -> str:
