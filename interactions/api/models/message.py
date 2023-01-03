@@ -800,16 +800,14 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
         if not self._client:
             raise LibraryException(code=13)
 
-        from .guild import Guild
-
-        return self._client.cache[Guild].get(self.guild_id)
+        return self.cache.get_guild(self.guild_id)
 
     @property
     def channel(self) -> Optional[Channel]:
         if not self._client:
             raise LibraryException(code=13)
 
-        return self._client.cache[Channel].get(self.channel_id)
+        return self.cache.get_channel(self.channel_id)
 
     async def get_channel(self) -> Channel:
         """
@@ -822,12 +820,12 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
         if not self._client:
             raise LibraryException(code=13)
 
-        if self.channel:
-            return self.channel
+        if channel := self.channel:
+            return channel
 
-        await self._client.get_channel(channel_id=int(self.channel_id))
+        res = await self._client.get_channel(channel_id=int(self.channel_id))
 
-        return self._client.cache[Channel].get(self.channel_id)
+        return self.cache.add_channel(res, self.guild_id)
 
     async def get_guild(self):
         """
@@ -840,14 +838,12 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
         if not self._client:
             raise LibraryException(code=13)
 
-        from .guild import Guild
+        if guild := self.guild:
+            return guild
 
-        if self.guild:
-            return self.guild
+        res = await self._client.get_guild(guild_id=int(self.guild_id))
 
-        await self._client.get_guild(guild_id=int(self.guild_id))
-
-        return self._client.cache[Guild].get(self.guild_id)
+        return self.cache.add_guild(res)
 
     async def delete(self, reason: Optional[str] = None) -> None:
         """
@@ -863,6 +859,8 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
         await self._client.delete_message(
             message_id=int(self.id), channel_id=int(self.channel_id), reason=reason
         )
+
+        self.cache.remove_message(self.id)
 
     async def edit(
         self,
@@ -991,60 +989,22 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
         if not self._client:
             raise LibraryException(code=13)
 
-        from ...client.models.component import _build_components
-
-        _content: str = "" if content is MISSING else content
-        _tts: bool = False if tts is MISSING else tts
-        # _file = None if file is None else file
-        # _attachments = [] if attachments else None
-        _embeds: list = (
-            []
-            if not embeds or embeds is MISSING
-            else ([embed._json for embed in embeds] if isinstance(embeds, list) else [embeds._json])
-        )
-        _allowed_mentions: dict = (
-            {}
-            if allowed_mentions is MISSING
-            else allowed_mentions._json
-            if isinstance(allowed_mentions, AllowedMentions)
-            else allowed_mentions
-        )
-        _message_reference = MessageReference(message_id=int(self.id))._json
-        _attachments = [] if attachments is MISSING else [a._json for a in attachments]
-        if not components or components is MISSING:
-            _components = []
-        else:
-            _components = _build_components(components=components)
-
-        if not files or files is MISSING:
-            _files = []
-        elif isinstance(files, list):
-            _files = [file._json_payload(id) for id, file in enumerate(files)]
-        else:
-            _files = [files._json_payload(0)]
-            files = [files]
-
-        _files.extend(_attachments)
-        _sticker_ids: list = (
-            [] if stickers is MISSING else [str(sticker.id) for sticker in stickers]
-        )
-
-        payload = dict(
-            content=_content,
-            tts=_tts,
-            attachments=_files,
-            embeds=_embeds,
-            message_reference=_message_reference,
-            allowed_mentions=_allowed_mentions,
-            components=_components,
-            sticker_ids=_sticker_ids,
+        payload, files = self._prepare_payload(
+            content=content,
+            tts=tts,
+            embeds=embeds,
+            files=files,
+            attachments=attachments,
+            allowed_mentions=allowed_mentions,
+            stickers=stickers,
+            components=components,
         )
 
         res = await self._client.create_message(
             channel_id=int(self.channel_id), payload=payload, files=files
         )
 
-        return self._client.cache[Message].get(Snowflake(res["id"]))
+        return self.cache.add_message(res)
 
     async def pin(self) -> None:
         """
@@ -1117,7 +1077,8 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
             invitable=_invitable,
             auto_archive_duration=_auto_archive_duration,
         )
-        return self._client.cache[Thread].get(Snowflake(res["id"]))
+
+        return self.cache.add_thread(res, self.guild_id)
 
     async def create_reaction(
         self,
@@ -1289,14 +1250,14 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
 
         if "channels/" not in url:
             raise LibraryException(message="You provided an invalid URL!", code=12)
+
         _, _channel_id, _message_id = url.split("channels/")[1].split("/")
         _message = await client.get_message(
             channel_id=_channel_id,
             message_id=_message_id,
         )
-        # TODO: YET THIS
 
-        return cls(**_message, _client=client)
+        return client.cache.add_message(_message)
 
     @property
     def url(self) -> str:
@@ -1330,10 +1291,12 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
             for component in components.components:
                 component.disabled = True
 
-        await self._client.edit_message(
+        res = await self._client.edit_message(
             int(self.channel_id),
             int(self.id),
             payload={"components": [component._json for component in self.components]},
         )
+
+        self.update(res)
 
         return self
