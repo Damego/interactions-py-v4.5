@@ -73,9 +73,6 @@ class UserRequest:
         """
         # only named recipient_id because of api mirroring
 
-        request = await self._req.request(
+        return await self._req.request(
             Route("POST", "/users/@me/channels"), json={"recipient_id": recipient_id}
         )
-        self.cache[Channel].add(Channel(**request, _client=self))
-
-        return request

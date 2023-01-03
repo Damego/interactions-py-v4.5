@@ -134,8 +134,6 @@ class MessageRequest:
         )
         await self._req.request(r, reason=reason)
 
-        self.cache[Message].pop(Snowflake(message_id))
-
     async def delete_messages(
         self, channel_id: int, message_ids: List[int], reason: Optional[str] = None
     ) -> None:
@@ -152,8 +150,6 @@ class MessageRequest:
         }
 
         await self._req.request(r, json=payload, reason=reason)
-
-        [self.cache[Message].pop(Snowflake(message_id)) for message_id in message_ids]
 
     async def edit_message(
         self, channel_id: int, message_id: int, payload: dict, files: Optional[List[File]] = MISSING
@@ -184,7 +180,7 @@ class MessageRequest:
                     "form-data", name=f"files[{str(id)}]", filename=file._filename
                 )
 
-        res = await self._req.request(
+        return await self._req.request(
             Route(
                 "PATCH",
                 "/channels/{channel_id}/messages/{message_id}",
@@ -194,10 +190,6 @@ class MessageRequest:
             json=payload,
             data=data,
         )
-
-        self.cache[Message].merge(Message(**res, _client=self))
-
-        return res
 
     async def pin_message(self, channel_id: int, message_id: int) -> None:
         """

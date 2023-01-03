@@ -27,10 +27,7 @@ class ChannelRequest:
         :param channel_id: Channel ID snowflake.
         :return: Dictionary of the channel object.
         """
-        request = await self._req.request(Route("GET", f"/channels/{channel_id}"))
-        self.cache[Channel].merge(Channel(**request, _client=self))
-
-        return request
+        return await self._req.request(Route("GET", f"/channels/{channel_id}"))
 
     async def delete_channel(self, channel_id: int) -> None:
         """

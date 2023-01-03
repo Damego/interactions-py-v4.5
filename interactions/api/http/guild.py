@@ -106,8 +106,6 @@ class GuildRequest:
         """
         await self._req.request(Route("DELETE", f"/guilds/{guild_id}"))
 
-        self.cache[Guild].pop(Snowflake(guild_id))
-
     async def get_guild_widget(self, guild_id: int) -> dict:
         """
         Returns the widget for the guild.
