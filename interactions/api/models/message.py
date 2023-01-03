@@ -1134,7 +1134,7 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
             raise LibraryException(code=13)
 
         _emoji = (
-            (f":{emoji.name.replace(':', '')}:{emoji.id or ''}" if emoji.id else emoji.name)
+            emoji.reaction_format
             if isinstance(emoji, Emoji)
             else emoji
         )
@@ -1171,7 +1171,7 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
             raise LibraryException(code=13)
 
         _emoji = (
-            (f":{emoji.name.replace(':', '')}:{emoji.id or ''}" if emoji.id else emoji.name)
+            emoji.reaction_format
             if isinstance(emoji, Emoji)
             else emoji
         )
@@ -1195,7 +1195,7 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
             raise LibraryException(code=13)
 
         _emoji = (
-            (f":{emoji.name.replace(':', '')}:{emoji.id or ''}" if emoji.id else emoji.name)
+            emoji.reaction_format
             if isinstance(emoji, Emoji)
             else emoji
         )
@@ -1216,7 +1216,7 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
         :param Union[Member, user, int] user: The user or user_id to remove the reaction of
         """
         _emoji = (
-            (f":{emoji.name.replace(':', '')}:{emoji.id or ''}" if emoji.id else emoji.name)
+            emoji.reaction_format
             if isinstance(emoji, Emoji)
             else emoji
         )
@@ -1250,7 +1250,7 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
         _all_users: List[User] = []
 
         _emoji = (
-            (f":{emoji.name.replace(':', '')}:{emoji.id or ''}" if emoji.id else emoji.name)
+            emoji.reaction_format
             if isinstance(emoji, Emoji)
             else emoji
         )

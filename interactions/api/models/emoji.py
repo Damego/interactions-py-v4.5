@@ -57,6 +57,10 @@ class Emoji(ClientSerializerMixin):
         )
 
     @property
+    def reaction_format(self) -> str:
+        return f":{self.name.replace(':', '')}:{self.id or ''}" if self.id else self.name
+
+    @property
     def created_at(self) -> datetime:
         """
         .. versionadded:: 4.4.0
