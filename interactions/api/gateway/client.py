@@ -421,38 +421,31 @@ class WebSocketClient:
         elif data["type"] == InteractionType.APPLICATION_COMMAND_AUTOCOMPLETE:
             _name = f"autocomplete_{_context.data.name}"
 
-            if _context.data.options:
-                for option in _context.data.options:
-                    if option.type not in (
-                        OptionType.SUB_COMMAND,
-                        OptionType.SUB_COMMAND_GROUP,
-                    ):
-                        if option.focused:
-                            __name, _value = self.__sub_command_context(option, _context)
-                            _name += f"_{__name}" if __name else ""
-                            if _value:
-                                __args.append(_value)
-                                break
+            for option in _context.data.options:
+                if option.type not in (
+                    OptionType.SUB_COMMAND,
+                    OptionType.SUB_COMMAND_GROUP,
+                ):
+                    if option.focused:
+                        _name += f"_{option.name}"
+                        __args.append(option.value)
+                        break
 
-                    elif option.type == OptionType.SUB_COMMAND:
-                        for _option in option.options:
-                            if _option.focused:
-                                __name, _value = self.__sub_command_context(_option, _context)
-                                _name += f"_{__name}" if __name else ""
-                                if _value:
-                                    __args.append(_value)
-                                break
-
-                    elif option.type == OptionType.SUB_COMMAND_GROUP:
-                        for _option in option.options:
-                            for __option in _option.options:
-                                if __option.focused:
-                                    __name, _value = self.__sub_command_context(__option, _context)
-                                    _name += f"_{__name}" if __name else ""
-                                    if _value:
-                                        __args.append(_value)
-                                    break
+                elif option.type == OptionType.SUB_COMMAND:
+                    for _option in option.options:
+                        if _option.focused:
+                            _name += f"_{_option.name}"
+                            __args.append(_option.value)
                             break
+
+                elif option.type == OptionType.SUB_COMMAND_GROUP:
+                    for _option in option.options:
+                        for __option in _option.options:
+                            if __option.focused:
+                                _name += f"_{__option.name}"
+                                __args.append(__option.value)
+                                break
+                        break
 
             self._dispatch.dispatch("on_autocomplete", _context)
         elif data["type"] == InteractionType.MODAL_SUBMIT:
@@ -624,13 +617,11 @@ class WebSocketClient:
             )
             if context.guild_id:
                 with suppress(AttributeError):  # edge-case
-                    for key in _members.keys():
-                        _members[key]._extras["guild_id"] = context.guild_id
+                    for member in _members.values():
+                        member._extras["guild_id"] = context.guild_id
 
-            _resolved = {
-                **(_members if _members is not None else {}),
-                **_roles,
-            }
+            _resolved = _members | _roles
+
         return _resolved
 
     def __select_option_type_context(self, context: "_Context", type: int) -> dict:
@@ -661,18 +652,15 @@ class WebSocketClient:
         elif type == ComponentType.ROLE_SELECT.value:
             _resolved = context.data.resolved.roles
         elif type == ComponentType.MENTIONABLE_SELECT.value:
-            if (
-                users := context.data.resolved.members
-                if context.guild_id
-                else context.data.resolved.users
-            ):
-                if context.guild_id:
-                    with suppress(AttributeError):  # edge-case
-                        for key in users.keys():
-                            users[key]._extras["guild_id"] = context.guild_id
-                _resolved.update(**users)
-            if roles := context.data.resolved.roles:
-                _resolved.update(**roles)
+            members = context.data.resolved.members if context.guild_id else context.data.resolved.users
+            roles = context.data.resolved.roles
+
+            if context.guild_id:
+                with suppress(AttributeError):  # edge-case
+                    for member in members.values():
+                        member._extras["guild_id"] = context.guild_id
+
+            _resolved = members | roles
 
         return _resolved
 
@@ -935,14 +923,16 @@ class WebSocketClient:
         :param Optional[Union[int, List[int]]] user_ids: Used to specify which users you wish to fetch.
         :param Optional[str] nonce: Nonce to identify the Guild Members Chunk response.
         """
-        _data: dict = {"guild_id": guild_id, "query": query or "", "limit": limit}
+        data: dict = {"guild_id": guild_id, "query": query or "", "limit": limit}
+
         if presences is not None:
-            _data["presences"] = presences
+            data["presences"] = presences
         if user_ids is not None:
-            _data["user_ids"] = user_ids
+            data["user_ids"] = user_ids
         if nonce is not None:
-            _data["nonce"] = nonce
-        payload: dict = {"op": OpCodeType.REQUEST_MEMBERS.value, "d": _data}
+            data["nonce"] = nonce
+
+        payload: dict = {"op": OpCodeType.REQUEST_MEMBERS.value, "d": data}
 
         await self._send_packet(payload)
         log.debug(f"REQUEST_MEMBERS: {payload}")
