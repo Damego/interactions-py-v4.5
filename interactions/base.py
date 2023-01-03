@@ -6,7 +6,8 @@ __all__ = (
     "__authors__",
 )
 
-__version__ = "4.4.0-beta.1"
+# This version won't be published in the PyPi, so I don't care about version
+__version__ = "4.5.0"
 
 __authors__ = {
     "current": [
