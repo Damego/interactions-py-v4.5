@@ -85,13 +85,9 @@ class GuildRequest:
         :rtype: dict
         """
 
-        response = await self._req.request(
+        return await self._req.request(
             Route("PATCH", f"/guilds/{guild_id}"), json=payload, reason=reason
         )
-
-        self.cache[Guild].merge(Guild(**response, _client=self))
-
-        return response
 
     async def leave_guild(self, guild_id: int) -> None:
         """
@@ -399,13 +395,9 @@ class GuildRequest:
         :param guild_id: Guild Snowflake ID
         :return: A list of channels.
         """
-        request = await self._req.request(
+        return await self._req.request(
             Route("GET", "/guilds/{guild_id}/channels", guild_id=guild_id)
         )
-
-        [self.cache[Channel].merge(Channel(**channel, _client=self)) for channel in request]
-
-        return request
 
     async def get_all_roles(self, guild_id: int) -> List[dict]:
         """
@@ -414,13 +406,9 @@ class GuildRequest:
         :param guild_id: Guild ID snowflake
         :return: An array of Role objects as dictionaries.
         """
-        request = await self._req.request(
+        return await self._req.request(
             Route("GET", "/guilds/{guild_id}/roles", guild_id=guild_id)
         )
-
-        [self.cache[Role].merge(Role(**role, _client=self)) for role in request]
-
-        return request
 
     async def create_guild_role(
         self, guild_id: int, payload: dict, reason: Optional[str] = None
@@ -433,13 +421,9 @@ class GuildRequest:
         :param reason: The reason for this action, if given.
         :return: Role object
         """
-        request = await self._req.request(
+        return await self._req.request(
             Route("POST", f"/guilds/{guild_id}/roles"), json=payload, reason=reason
         )
-
-        self.cache[Role].add(Role(**request, _client=self))
-
-        return request
 
     async def modify_guild_role_positions(
         self, guild_id: int, payload: List[dict], reason: Optional[str] = None
@@ -452,15 +436,11 @@ class GuildRequest:
         :param reason: The reason for this action, if given.
         :return: List of guild roles with updated hierarchy.
         """
-        response = await self._req.request(
+        return await self._req.request(
             Route("PATCH", f"/guilds/{guild_id}/roles"),
             json=payload,
             reason=reason,
         )
-
-        [self.cache[Role].merge(Role(**role, _client=self)) for role in response]
-
-        return response
 
     async def modify_guild_role(
         self, guild_id: int, role_id: int, payload: dict, reason: Optional[str] = None
@@ -474,12 +454,9 @@ class GuildRequest:
         :param reason: The reason for this action, if given.
         :return: Updated role object.
         """
-        response = await self._req.request(
+        return await self._req.request(
             Route("PATCH", f"/guilds/{guild_id}/roles/{role_id}"), json=payload, reason=reason
         )
-        self.cache[Role].merge(Role(**response, _client=self))
-
-        return response
 
     async def delete_guild_role(self, guild_id: int, role_id: int, reason: str = None) -> None:
         """
@@ -492,8 +469,6 @@ class GuildRequest:
         await self._req.request(
             Route("DELETE", f"/guilds/{guild_id}/roles/{role_id}"), reason=reason
         )
-
-        self.cache[Role].pop(Snowflake(guild_id))
 
     async def create_guild_kick(
         self, guild_id: int, user_id: int, reason: Optional[str] = None
@@ -512,8 +487,6 @@ class GuildRequest:
             r.path += f"?reason={quote(reason)}"
 
         await self._req.request(r)
-
-        self.cache[Member].pop((Snowflake(guild_id), Snowflake(user_id)))
 
     async def create_guild_ban(
         self,
@@ -536,7 +509,6 @@ class GuildRequest:
             json={"delete_message_seconds": delete_message_seconds},
             reason=reason,
         )
-        self.cache[Member].pop((Snowflake(guild_id), Snowflake(user_id)))
 
     async def remove_guild_ban(
         self, guild_id: int, user_id: int, reason: Optional[str] = None

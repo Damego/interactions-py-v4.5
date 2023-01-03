@@ -98,11 +98,9 @@ class ChannelRequest:
         :param reason: Reason to show in audit log, if needed.
         :return: Channel object as dictionary.
         """
-        request = await self._req.request(
+        return await self._req.request(
             Route("POST", f"/guilds/{guild_id}/channels"), json=payload, reason=reason
         )
-
-        return request
 
     async def move_channel(
         self,

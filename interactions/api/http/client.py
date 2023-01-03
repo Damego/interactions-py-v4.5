@@ -59,6 +59,7 @@ class HTTPClient(
         self.token = token
         self._req = _Request(self.token)
         self.cache = cache
+        self.cache._http = self  # dumb thing ik
 
         # An ideology is that this client does every single HTTP call, which reduces multiple ClientSessions in theory
         # because of how they are constructed/closed. This includes Gateway

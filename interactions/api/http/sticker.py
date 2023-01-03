@@ -44,11 +44,7 @@ class StickerRequest:
         :param guild_id: The guild to get stickers from
         :return: List of Stickers or None
         """
-        res = await self._req.request(Route("GET", f"/guilds/{guild_id}/stickers"))
-
-        [self.cache[Sticker].merge(Sticker(**sticker)) for sticker in res]
-
-        return res
+        return await self._req.request(Route("GET", f"/guilds/{guild_id}/stickers"))
 
     async def get_guild_sticker(self, guild_id: int, sticker_id: int) -> dict:
         """
@@ -58,11 +54,7 @@ class StickerRequest:
         :param sticker_id: The sticker to get from the guild
         :return: Sticker or None
         """
-        res = await self._req.request(Route("GET", f"/guilds/{guild_id}/stickers/{sticker_id}"))
-
-        self.cache[Sticker].merge(Sticker(**res))
-
-        return res
+        return await self._req.request(Route("GET", f"/guilds/{guild_id}/stickers/{sticker_id}"))
 
     async def create_guild_sticker(
         self, payload: dict, file: File, guild_id: int, reason: Optional[str] = None
@@ -91,13 +83,9 @@ class StickerRequest:
         for key, value in payload.items():
             data.add_field(key, value)
 
-        res = await self._req.request(
+        return await self._req.request(
             Route("POST", f"/guilds/{guild_id}/stickers"), data=data, reason=reason
         )
-
-        self.cache[Sticker].add(Sticker(**res))
-
-        return res
 
     async def modify_guild_sticker(
         self, payload: dict, guild_id: int, sticker_id: int, reason: Optional[str] = None
@@ -111,13 +99,9 @@ class StickerRequest:
         :param reason: The reason for this action.
         :return: The updated sticker data on success.
         """
-        res = await self._req.request(
+        return await self._req.request(
             Route("PATCH", f"/guilds/{guild_id}/stickers/{sticker_id}"), json=payload, reason=reason
         )
-
-        self.cache[Sticker].merge(Sticker(**res))
-
-        return res
 
     async def delete_guild_sticker(
         self, guild_id: int, sticker_id: int, reason: Optional[str] = None
@@ -133,5 +117,3 @@ class StickerRequest:
         await self._req.request(
             Route("DELETE", f"/guilds/{guild_id}/stickers/{sticker_id}"), reason=reason
         )
-
-        self.cache[Sticker].pop(Snowflake(sticker_id))

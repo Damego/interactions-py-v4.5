@@ -27,7 +27,7 @@ class MemberRequest:
         :param member_id: Member ID snowflake.
         :return: A member object, if any.
         """
-        res = await self._req.request(
+        return await self._req.request(
             Route(
                 "GET",
                 "/guilds/{guild_id}/members/{member_id}",
@@ -35,13 +35,6 @@ class MemberRequest:
                 member_id=member_id,
             )
         )
-
-        self.cache[Member].merge(
-            Member(**res, _client=self, guild_id=Snowflake(guild_id)),
-            id=(Snowflake(guild_id), Snowflake(res["id"])),
-        )
-
-        return res
 
     async def get_list_of_members(
         self, guild_id: int, limit: int = 1, after: Optional[int] = None
@@ -58,16 +51,7 @@ class MemberRequest:
         if after:
             payload["after"] = after
 
-        res = await self._req.request(Route("GET", f"/guilds/{guild_id}/members"), params=payload)
-
-        [
-            self.cache[Member].merge(
-                Member(**member, _client=self, guild_id=Snowflake(guild_id)),
-                id=(Snowflake(guild_id), Snowflake(res["id"])),
-            )
-            for member in res
-        ]
-        return res
+        return await self._req.request(Route("GET", f"/guilds/{guild_id}/members"), params=payload)
 
     async def search_guild_members(self, guild_id: int, query: str, limit: int = 1) -> List[dict]:
         """
@@ -151,17 +135,10 @@ class MemberRequest:
         :return: Modified member object.
         """
 
-        res = await self._req.request(
+        return await self._req.request(
             Route(
                 "PATCH", "/guilds/{guild_id}/members/{user_id}", guild_id=guild_id, user_id=user_id
             ),
             json=payload,
             reason=reason,
         )
-
-        self.cache[Member].merge(
-            Member(**res, _client=self, guild_id=Snowflake(guild_id)),
-            id=(Snowflake(guild_id), Snowflake(res["id"])),
-        )
-
-        return res

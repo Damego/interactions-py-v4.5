@@ -26,11 +26,7 @@ class EmojiRequest:
         :param guild_id: Guild ID snowflake.
         :return: A list of emojis.
         """
-        res = await self._req.request(Route("GET", f"/guilds/{guild_id}/emojis"))
-
-        [self.cache[Emoji].merge(Emoji(**emoji, _client=self)) for emoji in res]
-
-        return res
+        return await self._req.request(Route("GET", f"/guilds/{guild_id}/emojis"))
 
     async def get_guild_emoji(self, guild_id: int, emoji_id: int) -> dict:
         """
@@ -40,11 +36,7 @@ class EmojiRequest:
         :param emoji_id: Emoji ID snowflake.
         :return: Emoji object
         """
-        res = await self._req.request(Route("GET", f"/guilds/{guild_id}/emojis/{emoji_id}"))
-
-        self.cache[Emoji].merge(Emoji(**res, _client=self))
-
-        return res
+        return await self._req.request(Route("GET", f"/guilds/{guild_id}/emojis/{emoji_id}"))
 
     async def create_guild_emoji(
         self, guild_id: int, payload: dict, reason: Optional[str] = None
@@ -57,13 +49,9 @@ class EmojiRequest:
         :param reason: Optionally, give a reason.
         :return: An emoji object with the included parameters.
         """
-        res = await self._req.request(
+        return await self._req.request(
             Route("POST", f"/guilds/{guild_id}/emojis"), json=payload, reason=reason
         )
-
-        self.cache[Emoji].add(Emoji(**res, _client=self))
-
-        return res
 
     async def modify_guild_emoji(
         self, guild_id: int, emoji_id: int, payload: dict, reason: Optional[str] = None
@@ -77,13 +65,9 @@ class EmojiRequest:
         :param reason: Optionally, give a reason.
         :return: An emoji object with updated attributes.
         """
-        res = await self._req.request(
+        return await self._req.request(
             Route("PATCH", f"/guilds/{guild_id}/emojis/{emoji_id}"), json=payload, reason=reason
         )
-
-        self.cache[Emoji].merge(Emoji(**res, _client=self))
-
-        return res
 
     async def delete_guild_emoji(
         self, guild_id: int, emoji_id: int, reason: Optional[str] = None
@@ -98,5 +82,3 @@ class EmojiRequest:
         await self._req.request(
             Route("DELETE", f"/guilds/{guild_id}/emojis/{emoji_id}"), reason=reason
         )
-
-        self.cache[Emoji].pop(Snowflake(emoji_id))
