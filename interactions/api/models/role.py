@@ -120,6 +120,8 @@ class Role(ClientSerializerMixin, IDMixin):
             guild_id=_guild_id, role_id=int(self.id), reason=reason
         )
 
+        self.cache.remove_role(self.id, Snowflake(_guild_id))
+
     async def modify(
         self,
         guild_id: Union[int, Snowflake, "Guild"],
@@ -171,12 +173,14 @@ class Role(ClientSerializerMixin, IDMixin):
 
         _guild_id = int(guild_id) if isinstance(guild_id, (int, Snowflake)) else int(guild_id.id)
 
-        await self._client.modify_guild_role(
+        res = await self._client.modify_guild_role(
             guild_id=_guild_id,
             role_id=int(self.id),
             payload=payload,
             reason=reason,
         )
+
+        self.update(res)
 
         return self
 
@@ -208,4 +212,4 @@ class Role(ClientSerializerMixin, IDMixin):
             reason=reason,
         )
 
-        return [self._client.cache[Role].get(Snowflake(role["id"])) for role in res]
+        return self.cache.add_roles(res, Snowflake(_guild_id))

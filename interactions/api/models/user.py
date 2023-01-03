@@ -191,7 +191,7 @@ class User(ClientSerializerMixin, Messageable, IDMixin):
             channel_id=int(channel["id"]), payload=payload, files=files
         )
 
-        return self._client.cache[Message].get(Snowflake(res["id"]))
+        return self.cache.add_message(res)
 
     async def get_dm_channel(self) -> "Channel":
         """
@@ -205,8 +205,6 @@ class User(ClientSerializerMixin, Messageable, IDMixin):
         if not self._client:
             raise LibraryException(code=13)
 
-        from .channel import Channel
+        res = await self._client.create_dm(recipient_id=int(self.id))
 
-        channel = await self._client.create_dm(recipient_id=int(self.id))
-
-        return self._client.cache[Channel].get(Snowflake(channel["id"]))
+        return self.cache.add_channel(res)
