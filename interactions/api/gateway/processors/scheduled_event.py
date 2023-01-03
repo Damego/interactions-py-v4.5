@@ -11,7 +11,9 @@ class ScheduledEventProcessor(BaseProcessor):
         return self._update_event(events.GuildScheduledEvent, data)
 
     def guild_scheduled_event_delete(self, data: dict) -> tuple:
-        scheduled_event = self._delete_event(events.GuildScheduledEvent, data, id=Snowflake(data["id"]))
+        scheduled_event = self._delete_event(
+            events.GuildScheduledEvent, data, id=Snowflake(data["id"])
+        )
 
         return (scheduled_event,)
 

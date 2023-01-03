@@ -139,7 +139,7 @@ class ClientSerializerMixin(DictSerializerMixin):
     def __init__(self, kwargs_dict: dict = None, /, **other_kwargs):
         kwargs = kwargs_dict or other_kwargs
         self._client = kwargs.get("_client")
-        if not self.cache:
+        if not self._client:
             self.cache = self._client.cache
         super().__init__(**kwargs)
 

@@ -21,5 +21,3 @@ What changed?
 - Cleaned up code (partially). Removed duplicate code in http and in helper methods, removed guild modifying and more stuff.
 - Removed ``GuildMember``.
 - Renamed ``Tags`` to ``ForumTag``
-
-

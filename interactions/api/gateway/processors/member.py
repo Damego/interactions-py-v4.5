@@ -40,7 +40,9 @@ class MemberProcessor(BaseProcessor):
         guild = self._cache[Guild].get(guild_members.guild_id)
 
         for member in guild_members.members:
-            cache.add(member, id=(guild_members.guild_id, member.id))  # With `merge` method it will take a long time
+            cache.add(
+                member, id=(guild_members.guild_id, member.id)
+            )  # With `merge` method it will take a long time
             guild._member_ids.add(member.id)
 
         return (guild_members,)

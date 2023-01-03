@@ -1,6 +1,6 @@
 from ...models import gw as events
 from ...models.channel import Channel, Thread
-from ...models.guild import Guild, StageInstance
+from ...models.guild import StageInstance
 from ...models.misc import Snowflake
 from .base import BaseProcessor
 

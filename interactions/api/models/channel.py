@@ -736,7 +736,7 @@ class Channel(ClientSerializerMixin, Messageable, IDMixin):
         rate_limit_per_user: Optional[int] = MISSING,
         position: Optional[int] = MISSING,
         permission_overwrites: Optional[List[Overwrite]] = MISSING,
-        parent_id: Optional[int, str, Snowflake] = MISSING,
+        parent_id: Optional[Union[int, str, Snowflake]] = MISSING,
         nsfw: Optional[bool] = MISSING,
         archived: Optional[bool] = MISSING,
         auto_archive_duration: Optional[int] = MISSING,

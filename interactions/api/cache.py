@@ -15,7 +15,7 @@ from typing import (
 import interactions
 
 if TYPE_CHECKING:
-    from .models import Snowflake
+    from .models import Channel, Emoji, Guild, Member, Message, Role, Snowflake, Sticker, Thread
 
     Key = TypeVar("Key", Snowflake, Tuple[Snowflake, Snowflake])
 
@@ -172,9 +172,7 @@ class Cache:
     def _get_object(
         self,
         type: Type[_T],
-        object_id: Union[
-            interactions.Snowflake, Tuple[interactions.Snowflake, interactions.Snowflake]
-        ],
+        object_id: Union["Snowflake", Tuple["Snowflake", "Snowflake"]],
     ) -> _T:
         return self.storages[type].get(object_id)
 
@@ -182,29 +180,28 @@ class Cache:
         self,
         data: dict,
         type: Type[_T],
-        object_id: Union[
-            interactions.Snowflake, Tuple[interactions.Snowflake, interactions.Snowflake]
-        ] = None,
+        object_id: Union["Snowflake", Tuple["Snowflake", "Snowflake"]] = None,
     ) -> _T:
-        object = type(**data, _client=self._http)
+        if "_client" not in data:
+            data["_client"] = self._http
+
+        object = type(**data)
         self.storages[type].merge(object, object_id)
         return object
 
-    def get_guild(self, guild_id: interactions.Snowflake = None) -> Optional[interactions.Guild]:
+    def get_guild(self, guild_id: "Snowflake" = None) -> Optional["Guild"]:
         return self._get_object(interactions.Guild, guild_id) if guild_id else None
 
-    def add_guild(self, data: dict) -> interactions.Guild:
+    def add_guild(self, data: dict) -> "Guild":
         return self._add_object(data, interactions.Guild)
 
-    def remove_guild(self, guild_id: interactions.Snowflake) -> Optional[interactions.Guild]:
+    def remove_guild(self, guild_id: "Snowflake") -> Optional["Guild"]:
         return self.storages[interactions.Guild].pop(guild_id)
 
-    def get_channel(self, channel_id: interactions.Snowflake) -> Optional[interactions.Channel]:
+    def get_channel(self, channel_id: "Snowflake") -> Optional["Channel"]:
         return self._get_object(interactions.Channel, channel_id)
 
-    def add_channel(
-        self, data: dict, guild_id: interactions.Snowflake = None
-    ) -> interactions.Channel:
+    def add_channel(self, data: dict, guild_id: "Snowflake" = None) -> "Channel":
         channel = self._add_object(data, interactions.Channel)
 
         if guild := self.get_guild(guild_id or channel.guild_id):
@@ -212,12 +209,12 @@ class Cache:
 
         return channel
 
-    def add_channels(self, data: List[dict], guild_id: interactions.Snowflake = None):
+    def add_channels(self, data: List[dict], guild_id: "Snowflake" = None):
         return [self.add_channel(channel, guild_id) for channel in data]
 
     def remove_channel(
-        self, channel_id: interactions.Snowflake, guild_id: interactions.Snowflake = None
-    ) -> Optional[interactions.Channel]:
+        self, channel_id: "Snowflake", guild_id: "Snowflake" = None
+    ) -> Optional["Channel"]:
         channel = self[interactions.Channel].pop(channel_id)
 
         if guild := self.get_guild(guild_id or channel.guild_id):
@@ -225,10 +222,10 @@ class Cache:
 
         return channel
 
-    def get_thread(self, thread_id: interactions.Snowflake) -> Optional[interactions.Thread]:
+    def get_thread(self, thread_id: "Snowflake") -> Optional["Thread"]:
         return self._get_object(interactions.Thread, thread_id)
 
-    def add_thread(self, data: dict, guild_id: interactions.Snowflake = None) -> interactions.Thread:
+    def add_thread(self, data: dict, guild_id: "Snowflake" = None) -> "Thread":
         thread = self._add_object(data, interactions.Thread)
 
         if guild := self.get_guild(guild_id or thread.guild_id):
@@ -236,14 +233,12 @@ class Cache:
 
         return thread
 
-    def add_threads(
-        self, data: List[dict], guild_id: interactions.Snowflake = None
-    ) -> List[interactions.Thread]:
+    def add_threads(self, data: List[dict], guild_id: "Snowflake" = None) -> List["Thread"]:
         return [self.add_thread(thread, guild_id) for thread in data]
 
     def remove_thread(
-        self, thread_id: interactions.Snowflake, guild_id: interactions.Snowflake = None
-    ) -> Optional[interactions.Thread]:
+        self, thread_id: "Snowflake", guild_id: "Snowflake" = None
+    ) -> Optional["Thread"]:
         thread = self[interactions.Thread].pop(thread_id)
 
         if guild := self.get_guild(guild_id or thread.guild_id):
@@ -251,12 +246,10 @@ class Cache:
 
         return thread
 
-    def get_member(
-        self, guild_id: interactions.Snowflake, member_id: interactions.Snowflake
-    ) -> Optional[interactions.Member]:
+    def get_member(self, guild_id: "Snowflake", member_id: "Snowflake") -> Optional["Member"]:
         return self._get_object(interactions.Member, object_id=(guild_id, member_id))
 
-    def add_member(self, data: dict, guild_id: interactions.Snowflake) -> interactions.Member:
+    def add_member(self, data: dict, guild_id: "Snowflake") -> "Member":
         _id = (guild_id, interactions.Snowflake(data["user"]["id"]))
         member = self._add_object(data, interactions.Member, object_id=_id)
 
@@ -265,12 +258,10 @@ class Cache:
 
         return member
 
-    def add_members(
-        self, data: List[dict], guild_id: interactions.Snowflake
-    ) -> List[interactions.Member]:
+    def add_members(self, data: List[dict], guild_id: "Snowflake") -> List["Member"]:
         return [self.add_member(member, guild_id) for member in data]
 
-    def remove_member(self, user_id: interactions.Snowflake, guild_id: interactions.Snowflake):
+    def remove_member(self, user_id: "Snowflake", guild_id: "Snowflake"):
         member = self.storages[interactions.Member].pop((guild_id, user_id))
 
         if guild := self.get_guild(guild_id):
@@ -278,10 +269,10 @@ class Cache:
 
         return member
 
-    def get_role(self, role_id: interactions.Snowflake) -> Optional[interactions.Role]:
+    def get_role(self, role_id: "Snowflake") -> Optional["Role"]:
         return self._get_object(interactions.Role, role_id)
 
-    def add_role(self, data: dict, guild_id: interactions.Snowflake) -> interactions.Role:
+    def add_role(self, data: dict, guild_id: "Snowflake") -> "Role":
         role = self._add_object(data, interactions.Role)
 
         if guild := self.get_guild(guild_id):
@@ -289,14 +280,10 @@ class Cache:
 
         return role
 
-    def add_roles(
-        self, data: List[dict], guild_id: interactions.Snowflake
-    ) -> List[interactions.Role]:
+    def add_roles(self, data: List[dict], guild_id: "Snowflake") -> List["Role"]:
         return [self.add_role(role, guild_id) for role in data]
 
-    def remove_role(
-        self, role_id: interactions.Snowflake, guild_id: interactions.Snowflake
-    ) -> Optional[interactions.Role]:
+    def remove_role(self, role_id: "Snowflake", guild_id: "Snowflake") -> Optional["Role"]:
         role = self.storages[interactions.Role].pop(role_id)
 
         if guild := self.get_guild(guild_id):
@@ -304,10 +291,10 @@ class Cache:
 
         return role
 
-    def get_emoji(self, emoji_id: interactions.Snowflake) -> Optional[interactions.Emoji]:
+    def get_emoji(self, emoji_id: "Snowflake") -> Optional["Emoji"]:
         return self._get_object(interactions.Emoji, object_id=emoji_id)
 
-    def add_emoji(self, data: dict, guild_id: interactions.Snowflake) -> interactions.Emoji:
+    def add_emoji(self, data: dict, guild_id: "Snowflake") -> "Emoji":
         emoji = self._add_object(data, interactions.Emoji, guild_id)
 
         if guild := self.get_guild(guild_id):
@@ -315,14 +302,10 @@ class Cache:
 
         return emoji
 
-    def add_emojis(
-        self, data: List[dict], guild_id: interactions.Snowflake
-    ) -> List[interactions.Emoji]:
+    def add_emojis(self, data: List[dict], guild_id: "Snowflake") -> List["Emoji"]:
         return [self.add_emoji(emoji, guild_id) for emoji in data]
 
-    def remove_emoji(
-        self, emoji_id: interactions.Snowflake, guild_id: interactions.Snowflake
-    ) -> Optional[interactions.Emoji]:
+    def remove_emoji(self, emoji_id: "Snowflake", guild_id: "Snowflake") -> Optional["Emoji"]:
         emoji = self.storages[interactions.Emoji].pop(emoji_id)
 
         if guild := self.get_guild(guild_id):
@@ -330,10 +313,10 @@ class Cache:
 
         return emoji
 
-    def get_sticker(self, sticker_id: interactions.Snowflake) -> Optional[interactions.Sticker]:
+    def get_sticker(self, sticker_id: "Snowflake") -> Optional["Sticker"]:
         return self._get_object(interactions.Sticker, object_id=sticker_id)
 
-    def add_sticker(self, data: dict, guild_id: interactions.Snowflake) -> interactions.Sticker:
+    def add_sticker(self, data: dict, guild_id: "Snowflake") -> "Sticker":
         sticker = self._add_object(data, interactions.Sticker, guild_id)
 
         if guild := self.get_guild(guild_id):
@@ -341,14 +324,10 @@ class Cache:
 
         return sticker
 
-    def add_stickers(
-        self, data: List[dict], guild_id: interactions.Snowflake
-    ) -> List[interactions.Sticker]:
+    def add_stickers(self, data: List[dict], guild_id: "Snowflake") -> List["Sticker"]:
         return [self.add_sticker(sticker, guild_id) for sticker in data]
 
-    def remove_sticker(
-        self, sticker_id: interactions.Snowflake, guild_id: interactions.Snowflake
-    ) -> Optional[interactions.Emoji]:
+    def remove_sticker(self, sticker_id: "Snowflake", guild_id: "Snowflake") -> Optional["Emoji"]:
         sticker = self.storages[interactions.Emoji].pop(sticker_id)
 
         if guild := self.get_guild(guild_id):
@@ -356,14 +335,14 @@ class Cache:
 
         return sticker
 
-    def get_message(self, message_id: interactions.Snowflake) -> Optional[interactions.Message]:
+    def get_message(self, message_id: "Snowflake") -> Optional["Message"]:
         return self._get_object(interactions.Message, message_id)
 
-    def add_message(self, data: dict) -> interactions.Message:
+    def add_message(self, data: dict) -> "Message":
         return self._add_object(data, interactions.Message)
 
-    def add_messages(self, data: List[dict]) -> List[interactions.Message]:
+    def add_messages(self, data: List[dict]) -> List["Message"]:
         return [self.add_message(message) for message in data]
 
-    def remove_message(self, message_id: interactions.Snowflake) -> interactions.Message:
+    def remove_message(self, message_id: "Snowflake") -> "Message":
         return self.storages[interactions.Message].pop(message_id)
