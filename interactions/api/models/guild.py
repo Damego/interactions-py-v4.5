@@ -1231,6 +1231,8 @@ class Guild(ClientSerializerMixin, IDMixin):
 
         await self._client.leave_guild(guild_id=int(self.id))
 
+        self.cache.remove_guild(self.id)
+
     async def modify(
         self,
         name: Optional[str] = MISSING,
