@@ -1,7 +1,6 @@
 from typing import Optional
 
 from ...api.cache import Cache
-from ..models.channel import Channel
 from ..models.user import User
 from .request import _Request
 from .route import Route

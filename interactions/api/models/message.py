@@ -1094,11 +1094,7 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
         if not self._client:
             raise LibraryException(code=13)
 
-        _emoji = (
-            emoji.reaction_format
-            if isinstance(emoji, Emoji)
-            else emoji
-        )
+        _emoji = emoji.reaction_format if isinstance(emoji, Emoji) else emoji
 
         return await self._client.create_reaction(
             channel_id=int(self.channel_id), message_id=int(self.id), emoji=_emoji
@@ -1131,11 +1127,7 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
         if not self._client:
             raise LibraryException(code=13)
 
-        _emoji = (
-            emoji.reaction_format
-            if isinstance(emoji, Emoji)
-            else emoji
-        )
+        _emoji = emoji.reaction_format if isinstance(emoji, Emoji) else emoji
 
         return await self._client.remove_all_reactions_of_emoji(
             channel_id=int(self.channel_id), message_id=int(self.id), emoji=_emoji
@@ -1155,11 +1147,7 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
         if not self._client:
             raise LibraryException(code=13)
 
-        _emoji = (
-            emoji.reaction_format
-            if isinstance(emoji, Emoji)
-            else emoji
-        )
+        _emoji = emoji.reaction_format if isinstance(emoji, Emoji) else emoji
 
         return await self._client.remove_self_reaction(
             channel_id=int(self.channel_id), message_id=int(self.id), emoji=_emoji
@@ -1176,11 +1164,7 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
         :param Union[str, Emoji] emoji: The Emoji as object or formatted as `name:id`
         :param Union[Member, user, int] user: The user or user_id to remove the reaction of
         """
-        _emoji = (
-            emoji.reaction_format
-            if isinstance(emoji, Emoji)
-            else emoji
-        )
+        _emoji = emoji.reaction_format if isinstance(emoji, Emoji) else emoji
         if not self._client:
             raise LibraryException(code=13)
 
@@ -1210,11 +1194,7 @@ class Message(ClientSerializerMixin, Messageable, IDMixin):
 
         _all_users: List[User] = []
 
-        _emoji = (
-            emoji.reaction_format
-            if isinstance(emoji, Emoji)
-            else emoji
-        )
+        _emoji = emoji.reaction_format if isinstance(emoji, Emoji) else emoji
 
         res: List[dict] = await self._client.get_reactions_of_emoji(
             channel_id=int(self.channel_id), message_id=int(self.id), emoji=_emoji, limit=100

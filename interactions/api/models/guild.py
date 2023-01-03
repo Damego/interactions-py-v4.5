@@ -2375,7 +2375,6 @@ class Guild(ClientSerializerMixin, IDMixin):
 
         self.cache.remove_sticker(Snowflake(_id), self.id)
 
-
     async def get_list_of_members(
         self,
         limit: Optional[int] = 1,

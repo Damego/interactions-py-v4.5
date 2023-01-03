@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, List, Optional, Union
 
+from ...client.models.messageable import Messageable
 from ...utils.attrs_utils import ClientSerializerMixin, convert_int, convert_list, define, field
 from ...utils.missing import MISSING
 from ...utils.utils import search_iterable
@@ -10,7 +11,6 @@ from .flags import Permissions
 from .misc import AllowedMentions, File, IDMixin, Snowflake
 from .role import Role
 from .user import User
-from ...client.models.messageable import Messageable
 
 if TYPE_CHECKING:
     from ...client.models.component import ActionRow, Button, SelectMenu
