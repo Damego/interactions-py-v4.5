@@ -53,7 +53,7 @@ class GuildProcessor(BaseProcessor):
         return (events.GuildIntegrations(**data),)
 
     def voice_state_update(self, data: dict) -> tuple:
-        before, after = self._update_event(events.VoiceState, data)
+        before, after = self._update_event(events.VoiceState, data, id=Snowflake(data["user_id"]))
 
         # User left from voice channel, so we don't need to store it in the cache anymore
         if after.channel_id is None:
