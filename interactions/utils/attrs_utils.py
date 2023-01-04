@@ -133,14 +133,13 @@ class DictSerializerMixin:
 
 @attrs.define(eq=False, init=False, on_setattr=attrs.setters.NO_OP)
 class ClientSerializerMixin(DictSerializerMixin):
-    cache = attrs.field(init=False, repr=False, default=None)
-    _client = attrs.field(init=False, repr=False, default=None)
+    cache = attrs.field(init=False, repr=False)
+    _client = attrs.field(init=False, repr=False)
 
     def __init__(self, kwargs_dict: dict = None, /, **other_kwargs):
         kwargs = kwargs_dict or other_kwargs
         self._client = kwargs.get("_client")
-        if not self._client:
-            self.cache = self._client.cache
+        self.cache = self._client.cache if self._client else None
         super().__init__(**kwargs)
 
 
