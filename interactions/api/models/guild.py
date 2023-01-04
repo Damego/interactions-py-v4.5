@@ -485,7 +485,7 @@ class Guild(ClientSerializerMixin, IDMixin):
         return [self.cache.get_role(id) for id in self._role_ids]
 
     @property
-    def channel(self) -> List[Channel]:
+    def channels(self) -> List[Channel]:
         return [self.cache.get_channel(id) for id in self._channel_ids]
 
     @property
