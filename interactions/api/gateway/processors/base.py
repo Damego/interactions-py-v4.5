@@ -32,8 +32,9 @@ class BaseProcessor:
         *,
         id: Union[Snowflake, Tuple[Snowflake, Snowflake]] = None
     ) -> Tuple[Optional[T], T]:
-        obj: Union[DictSerializerMixin, IDMixin] = model(**data)
-        cached_object: Union[DictSerializerMixin, IDMixin] = self._cache[model].get(id or obj.id)
+        obj: DictSerializerMixin = model(**data)
+        _id = obj.id if hasattr(obj, "id") and not id else id
+        cached_object: DictSerializerMixin = self._cache[model].get(_id)
 
         if cached_object:
             before = model(**cached_object._json, _client=self._http)
@@ -42,7 +43,7 @@ class BaseProcessor:
             before = None
             cached_object = obj
 
-            self._cache[model].add(obj, id=id or obj.id)
+            self._cache[model].add(obj, id=_id)
 
         return before, cached_object
 
