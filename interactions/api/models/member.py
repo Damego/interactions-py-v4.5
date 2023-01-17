@@ -102,12 +102,11 @@ class Member(ClientSerializerMixin, IDMixin, Messageable):
         :rtype: Guild
         """
         _id = self.guild_id
-        from .guild import Guild
 
         if not _id or isinstance(_id, LibraryException):
             return
 
-        return self._client.cache[Guild].get(_id, None)
+        return self.cache.get_guild(_id)
 
     @property
     def guild_id(self) -> Optional[Union[Snowflake, LibraryException]]:
