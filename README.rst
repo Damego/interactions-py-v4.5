@@ -20,4 +20,6 @@ What changed?
 - Made stickers and emojis store in the cache and made they as property of ``Guild``.
 - Cleaned up code (partially). Removed duplicate code in http and in helper methods, removed guild modifying and more stuff.
 - Removed ``GuildMember``.
-- Renamed ``Tags`` to ``ForumTag``
+- Renamed ``Tags`` to ``ForumTag``.
+- Implemented helper methods for cache to add/get objects. Removed all cache modifying in the http methods. Using cache helpers in object helpers ?!
+- Removed tag's related http methods.
