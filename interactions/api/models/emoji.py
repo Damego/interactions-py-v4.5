@@ -91,8 +91,8 @@ class Emoji(ClientSerializerMixin):
         _guild_id = int(guild_id) if isinstance(guild_id, (int, Snowflake)) else int(guild_id.id)
 
         res = await client.get_guild_emoji(guild_id=_guild_id, emoji_id=int(emoji_id))
-        emoji = cls(**res, _client=client)
-        client.cache[Emoji].merge(emoji)
+
+        emoji = client.cache.add_emoji(res, guild_id)
 
         return emoji
 
