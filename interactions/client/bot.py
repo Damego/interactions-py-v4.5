@@ -526,8 +526,7 @@ class Client:
             )
 
         guilds.extend(res)
-
-        [self.cache[Guild].merge(Guild(**guild, _client=self)) for guild in guilds]
+        [self.cache.add_guild(guild) for guild in guilds]
 
         return guilds
 
