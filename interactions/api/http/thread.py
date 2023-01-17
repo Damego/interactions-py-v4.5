@@ -216,13 +216,11 @@ class ThreadRequest:
         if auto_archive_duration:
             payload["auto_archive_duration"] = auto_archive_duration
 
-        request = await self._req.request(
+        return await self._req.request(
             Route("POST", f"/channels/{channel_id}/messages/{message_id}/threads"),
             json=payload,
             reason=reason,
         )
-        self.cache[Thread].add(Thread(**request, _client=self))
-        return request
 
     async def create_thread_in_forum(
         self,

@@ -159,7 +159,7 @@ class _Context(ClientSerializerMixin, Messageable):
             return guild
 
         res = await self._client.get_guild(int(self.guild_id))
-        return Guild(**res, _client=self._client)
+        return self.cache.add_guild(res)
 
     async def send(
         self,

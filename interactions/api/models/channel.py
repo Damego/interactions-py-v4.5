@@ -1913,7 +1913,7 @@ class Channel(ClientSerializerMixin, Messageable, IDMixin):
 
         data = await self._client.create_thread_in_forum(int(self.id), **_top_payload)
 
-        return Thread(**data, _client=self._client)
+        return self.cache.add_thread(data, self.guild_id)
 
     async def get_permissions_for(self, member: "Member") -> Permissions:
         """

@@ -255,12 +255,14 @@ async def _http_request(
     from ..api.models.emoji import Emoji
 
     if obj in (Role, Emoji):
-        from ..api.models.guild import Guild
-
-        _guild = Guild(**await http.get_guild(kwargs.pop("guild_id")), _client=http)
+        res = await http.get_guild(kwargs.pop("guild_id"))
+        _guild = http.cache.add_guild(res)
         _func = getattr(_guild, _name)
         return await _func(**kwargs)
 
+    # I don't like this. This thing doesn't adds object to cache.
+    # So
+    # TODO: yeet this
     _func = getattr(http, _name)
     _obj = await _func(**kwargs)
     return obj(**_obj, _client=http)

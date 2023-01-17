@@ -61,20 +61,10 @@ class MemberRequest:
         :param limit: The number of members to return. Defaults to 1.
         """
 
-        res = await self._req.request(
+        return await self._req.request(
             Route("GET", f"/guilds/{guild_id}/members/search"),
             params={"query": query, "limit": limit},
         )
-
-        [
-            self.cache[Member].merge(
-                Member(**member, _client=self, guild_id=Snowflake(guild_id)),
-                id=(Snowflake(guild_id), Snowflake(res["id"])),
-            )
-            for member in res
-        ]
-
-        return res
 
     async def add_member_role(
         self, guild_id: int, user_id: int, role_id: int, reason: Optional[str] = None

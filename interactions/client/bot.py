@@ -513,22 +513,23 @@ class Client:
         """
 
         _after = None
-        _all: list = []
+        guilds: list = []
 
         res = await self._http.get_self_guilds(limit=200)
 
         while len(res) >= 200:
+            guilds.extend(res)
 
-            _all.extend(res)
             _after = int(res[-1]["id"])
-
             res = await self._http.get_self_guilds(
                 after=_after,
             )
 
-        _all.extend(res)
+        guilds.extend(res)
 
-        return _all
+        [self.cache[Guild].merge(Guild(**guild, _client=self)) for guild in guilds]
+
+        return guilds
 
     async def __get_all_commands(self) -> None:
         # this method is just copied from the sync method

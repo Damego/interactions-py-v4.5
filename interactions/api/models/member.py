@@ -610,7 +610,8 @@ class Member(ClientSerializerMixin, IDMixin, Messageable):
         else:
             _guild_id = int(guild_id.id) if isinstance(guild_id, Guild) else int(guild_id)
 
-        guild = Guild(**await self._client.get_guild(int(_guild_id)), _client=self._client)
+        res = await self._client.get_guild(int(_guild_id))
+        guild = self.cache.add_guild(res)
 
         if int(guild.owner_id) == int(self.id):
             return Permissions.ALL

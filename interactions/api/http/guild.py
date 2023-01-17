@@ -40,11 +40,7 @@ class GuildRequest:
         if after:
             params["after"] = after
 
-        request = await self._req.request(Route("GET", "/users/@me/guilds"), params=params)
-
-        [self.cache[Guild].merge(Guild(**guild, _client=self)) for guild in request]
-
-        return request
+        return await self._req.request(Route("GET", "/users/@me/guilds"), params=params)
 
     async def get_guild(self, guild_id: int, with_counts: bool = False) -> dict:
         """
@@ -54,12 +50,9 @@ class GuildRequest:
         :param with_counts: Whether the approximate member count should be included
         :return: The guild object associated, if any.
         """
-        request = await self._req.request(
+        return await self._req.request(
             Route("GET", f"/guilds/{guild_id}{f'?{with_counts=}' if with_counts else ''}")
         )
-        self.cache[Guild].merge(Guild(**request, _client=self))
-
-        return request
 
     async def get_guild_preview(self, guild_id: int) -> dict:
         """
@@ -95,8 +88,6 @@ class GuildRequest:
         :return: None
         """
         await self._req.request(Route("DELETE", f"/users/@me/guilds/{guild_id}", guild_id=guild_id))
-
-        self.cache[Guild].pop(Snowflake(guild_id))
 
     async def delete_guild(self, guild_id: int) -> None:
         """
@@ -289,14 +280,11 @@ class GuildRequest:
         }
         if icon:
             payload["icon"] = icon
-        response = await self._req.request(
+
+        return await self._req.request(
             Route("POST", f"/guilds/templates/{template_code}"),
             json=payload,
         )
-
-        self.cache[Guild].add(Guild(**response, _client=self))
-
-        return response
 
     async def get_guild_template(self, template_code: str) -> dict:
         """

@@ -73,13 +73,9 @@ class ChannelRequest:
         if around:
             params["around"] = around
 
-        request = await self._req.request(
+        return await self._req.request(
             Route("GET", f"/channels/{channel_id}/messages"), params=params
         )
-
-        [self.cache[Message].merge(Message(**message, _client=self)) for message in request]
-
-        return request
 
     async def create_channel(
         self, guild_id: int, payload: dict, reason: Optional[str] = None

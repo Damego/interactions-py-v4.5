@@ -35,10 +35,7 @@ class UserRequest:
         if user_id is None:
             user_id = "@me"
 
-        request = await self._req.request(Route("GET", f"/users/{user_id}"))
-        self.cache[User].add(User(**request))
-
-        return request
+        return await self._req.request(Route("GET", f"/users/{user_id}"))
 
     async def modify_self(self, payload: dict) -> dict:
         """
