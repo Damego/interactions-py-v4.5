@@ -741,6 +741,7 @@ class Channel(ClientSerializerMixin, Messageable, IDMixin):
         archived: Optional[bool] = MISSING,
         auto_archive_duration: Optional[int] = MISSING,
         locked: Optional[bool] = MISSING,
+        available_tags: Optional[List[ForumTag]] = MISSING,
         reason: Optional[str] = None,
     ) -> "Channel":  # sourcery skip: low-code-quality
         """
@@ -813,6 +814,8 @@ class Channel(ClientSerializerMixin, Messageable, IDMixin):
             payload["auto_archive_duration"] = auto_archive_duration
         if locked is not MISSING:
             payload["locked"] = locked
+        if available_tags is not MISSING:
+            payload["available_tags"] = available_tags
 
         res = await self._client.modify_channel(
             channel_id=int(self.id),
@@ -1691,13 +1694,16 @@ class Channel(ClientSerializerMixin, Messageable, IDMixin):
         if emoji_name is not MISSING:
             payload["emoji_name"] = emoji_name
 
-        data = await self._client.create_tag(int(self.id), **payload)
+        tag = ForumTag(**payload)
+        self.available_tags.append(tag)
 
-        return ForumTag(**data)
+        await self.modify(available_tags=self.available_tags)
+
+        return [tag for tag in self.available_tags if tag.name == name][0]
 
     async def edit_tag(
         self,
-        tag_id: Union[int, str, Snowflake, ForumTag],  # discord, why :hollow:
+        tag_id: Union[int, str, Snowflake, ForumTag],
         name: Optional[str] = MISSING,
         emoji_name: Optional[str] = MISSING,
         emoji_id: Optional[int] = MISSING,
@@ -1731,20 +1737,18 @@ class Channel(ClientSerializerMixin, Messageable, IDMixin):
                 code=14, message="ForumTag can only be created in forum channels!"
             )
 
-        _tag_id = int(tag_id.id if isinstance(tag_id, ForumTag) else tag_id)
-
-        payload = {}
+        tag = tag_id if isinstance(tag_id, ForumTag) else [tag for tag in self.available_tags if tag.id == tag_id][0]
 
         if name is not MISSING:
-            payload["name"] = name
+            tag.name = name
         if emoji_id is not MISSING:
-            payload["emoji_id"] = emoji_id
+            tag.emoji_id = emoji_id
         if emoji_name is not MISSING:
-            payload["emoji_name"] = emoji_name
+            tag.emoji_name = emoji_name
 
-        data = await self._client.edit_tag(int(self.id), _tag_id, **payload)
+        await self.modify(available_tags=self.available_tags)
 
-        return ForumTag(**data)
+        return [tag for tag in self.available_tags if tag.id == tag_id][0]
 
     async def delete_tag(
         self, tag_id: Union[int, str, Snowflake, ForumTag]  # discord, why :hollow:
@@ -1764,9 +1768,11 @@ class Channel(ClientSerializerMixin, Messageable, IDMixin):
                 code=14, message="ForumTag can only be created in forum channels!"
             )
 
-        _tag_id = int(tag_id.id) if isinstance(tag_id, ForumTag) else int(tag_id)
+        tag = tag_id if isinstance(tag_id, ForumTag) else [tag for tag in self.available_tags if tag.id == tag_id][0]
 
-        return await self._client.delete_tag(int(self.id), _tag_id)
+        self.available_tags.remove(tag)
+
+        await self.modify(available_tags=self.available_tags)
 
     async def create_forum_post(
         self,
