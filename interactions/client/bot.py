@@ -151,7 +151,7 @@ class Client:
         self.command_context: Type["_Context"] = command_context
         self.component_context: Type["_Context"] = component_context
 
-    def __raw_interaction_event(self, data: dict):
+    async def __raw_interaction_event(self, data: dict):
         if data.get("type") is None:
             return log.warning(
                 "Context is being created for the interaction, but no type is specified. Skipping..."
