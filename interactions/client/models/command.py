@@ -898,7 +898,6 @@ class Command(DictSerializerMixin):
 
         @wraps(coro)
         async def wrapper(ctx: "CommandContext", *args, **kwargs):
-            ctx.client = self.client
             ctx.command = self
             ctx.extension = self.extension
 

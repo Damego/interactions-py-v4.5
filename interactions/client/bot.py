@@ -158,6 +158,8 @@ class Client:
             )
 
         _context = self._get_context(data)
+        _context.client = self
+
         _name: str = ""
         __args: list = [_context]
         __kwargs: dict = {}

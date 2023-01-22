@@ -63,6 +63,9 @@ class _Context(ClientSerializerMixin, Messageable):
     locale: Optional[Locale] = field(converter=Locale, default=None)
     guild_locale: Optional[Locale] = field(converter=Locale, default=None)
 
+    # External attrs
+    client: "Client" = field(default=None, init=False)
+
     def __attrs_post_init__(self) -> None:
         if self.member and self.guild_id:
             self.member._extras["guild_id"] = self.guild_id
@@ -341,7 +344,6 @@ class CommandContext(_Context):
 
     target: Optional[Union[Message, Member, User]] = field(default=None)
 
-    client: "Client" = field(default=None, init=False)
     command: "Command" = field(default=None, init=False)
     extension: "Extension" = field(default=None, init=False)
 
