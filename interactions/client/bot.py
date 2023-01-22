@@ -8,7 +8,8 @@ from importlib import import_module
 from importlib.util import resolve_name
 from inspect import getmembers, isawaitable
 from types import ModuleType
-from typing import Any, Awaitable, Callable, Coroutine, Dict, List, Optional, Tuple, Union
+from typing import Any, Awaitable, Callable, Coroutine, Dict, List, Optional, Tuple, Union, TYPE_CHECKING, Type
+from contextlib import suppress
 
 from ..api import WebSocketClient as WSClient
 from ..api.cache import Cache
@@ -29,9 +30,12 @@ from ..utils.attrs_utils import convert_list
 from ..utils.missing import MISSING
 from .context import CommandContext, ComponentContext
 from .decor import component as _component
-from .enums import ApplicationCommandType, Locale, OptionType
+from .enums import ApplicationCommandType, Locale, OptionType, InteractionType, ComponentType
 from .models.command import ApplicationCommand, Choice, Command, Option
 from .models.component import ActionRow, Button, Modal, SelectMenu
+
+if TYPE_CHECKING:
+    from .context import _Context
 
 log: logging.Logger = get_logger("client")
 
@@ -78,6 +82,8 @@ class Client:
         presence: Optional[ClientPresence] = None,
         _logging: Union[bool, int] = None,
         disable_sync: bool = False,
+        command_context: Type["_Context"] = CommandContext,
+        component_context: Type["_Context"] = ComponentContext,
         **kwargs,
     ) -> None:
         self._loop: AbstractEventLoop = get_event_loop()
@@ -140,6 +146,271 @@ class Client:
             )
         else:
             self._automate_sync = True
+
+        self.event(name="raw_interaction_event")(self.__raw_interaction_event)
+        self.command_context: Type["_Context"] = command_context
+        self.component_context: Type["_Context"] = component_context
+
+    def __raw_interaction_event(self, data: dict):
+        if data.get("type") is None:
+            return log.warning(
+                "Context is being created for the interaction, but no type is specified. Skipping..."
+            )
+
+        _context = self._get_context(data)
+        _name: str = ""
+        __args: list = [_context]
+        __kwargs: dict = {}
+
+        if data["type"] == InteractionType.APPLICATION_COMMAND:
+            _name = f"command_{_context.data.name}"
+
+            if options := _context.data.options:
+                for option in options:
+                    _type = self.__option_type_context(
+                        _context,
+                        option.type.value,
+                    )
+                    if _type:
+                        _type[option.value]._client = self._http
+                        option.value = _type[option.value]
+                    _option = self.__sub_command_context(option, _context)
+                    __kwargs.update(_option)
+
+            self._websocket._dispatch.dispatch("on_command", _context)
+        elif data["type"] == InteractionType.MESSAGE_COMPONENT:
+            _name = f"component_{_context.data.custom_id}"
+
+            if values := _context.data.values:
+                if _context.data.component_type.value not in {5, 6, 7, 8}:
+                    __args.append(values)
+                else:
+                    _list = []  # temp storage for items
+                    _data = self.__select_option_type_context(
+                        _context, _context.data.component_type.value
+                    )  # resolved.
+                    for value in values:
+                        _list.append(_data[value])
+                    __args.append(_list)
+
+            self._websocket._dispatch.dispatch("on_component", _context)
+        elif data["type"] == InteractionType.APPLICATION_COMMAND_AUTOCOMPLETE:
+            _name = f"autocomplete_{_context.data.name}"
+
+            for option in _context.data.options:
+                if option.type not in (
+                    OptionType.SUB_COMMAND,
+                    OptionType.SUB_COMMAND_GROUP,
+                ):
+                    if option.focused:
+                        _name += f"_{option.name}"
+                        __args.append(option.value)
+                        break
+
+                elif option.type == OptionType.SUB_COMMAND:
+                    for _option in option.options:
+                        if _option.focused:
+                            _name += f"_{_option.name}"
+                            __args.append(_option.value)
+                            break
+
+                elif option.type == OptionType.SUB_COMMAND_GROUP:
+                    for _option in option.options:
+                        for __option in _option.options:
+                            if __option.focused:
+                                _name += f"_{__option.name}"
+                                __args.append(__option.value)
+                                break
+                        break
+
+            self._websocket._dispatch.dispatch("on_autocomplete", _context)
+        elif data["type"] == InteractionType.MODAL_SUBMIT:
+            _name = f"modal_{_context.data.custom_id}"
+
+            __args.extend(
+                [
+                    component.value
+                    for action_row in _context.data.components
+                    for component in action_row.components
+                ]
+            )
+
+            self._websocket._dispatch.dispatch("on_modal", _context)
+
+        self._websocket._dispatch.dispatch(_name, *__args, **__kwargs)
+        self._websocket._dispatch.dispatch("on_interaction", _context)
+        self._websocket._dispatch.dispatch("on_interaction_create", _context)
+
+    def _get_context(self, data: dict) -> Optional["_Context"]:
+        """
+        Takes raw data given back from the Gateway
+        and gives "context" based off of what it is.
+
+        :param dict data: The data from the Gateway.
+        :return: The context object.
+        :rtype: Any
+        """
+        if data["type"] == InteractionType.PING:
+            return
+
+        data["_client"] = self._http
+
+        if data["type"] in (
+            InteractionType.APPLICATION_COMMAND,
+            InteractionType.APPLICATION_COMMAND_AUTOCOMPLETE,
+            InteractionType.MODAL_SUBMIT,
+        ):
+            return self.command_context(**data)
+        elif data["type"] == InteractionType.MESSAGE_COMPONENT:
+            return self.component_context(**data)
+
+    def __sub_command_context(self, option: Option, context: "_Context") -> Union[Tuple[str], dict]:
+        """
+        Checks if an application command schema has sub commands
+        needed for argument collection.
+
+        :param Option option: The option object
+        :param _Context context: The context to refer subcommands from.
+        :return: A dictionary of the collected options, if any.
+        :rtype: Union[Tuple[str], dict]
+        """
+        __kwargs: dict = {}
+
+        def _check_auto(_option: Option) -> Optional[Tuple[str]]:
+            return (_option.name, _option.value) if _option.focused else None
+
+        check = _check_auto(option)
+
+        if check:
+            return check
+        if options := option.options:
+            if option.type == OptionType.SUB_COMMAND:
+                __kwargs["sub_command"] = option.name
+
+                for sub_option in options:
+                    _check = _check_auto(sub_option)
+                    _type = self.__option_type_context(
+                        context,
+                        sub_option.type,
+                    )
+
+                    if _type:
+                        _type[sub_option.value]._client = self._http
+                        sub_option.value = _type[sub_option.value]
+                    if _check:
+                        return _check
+
+                    __kwargs[sub_option.name] = sub_option.value
+            elif option.type == OptionType.SUB_COMMAND_GROUP:
+                __kwargs["sub_command_group"] = option.name
+                for _group_option in option.options:
+                    _check_auto(_group_option)
+                    __kwargs["sub_command"] = _group_option.name
+
+                    for sub_option in _group_option.options:
+                        _check = _check_auto(sub_option)
+                        _type = self.__option_type_context(
+                            context,
+                            sub_option.type,
+                        )
+
+                        if _type:
+                            _type[sub_option.value]._client = self._http
+                            sub_option.value = _type[sub_option.value]
+                        if _check:
+                            return _check
+
+                        __kwargs[sub_option.name] = sub_option.value
+
+        elif option.type == OptionType.SUB_COMMAND:
+            # sub_command_groups must have options so there is no extra check needed for those
+            __kwargs["sub_command"] = option.name
+
+        elif (name := option.name) is not None and (value := option.value) is not None:
+            __kwargs[name] = value
+
+        return __kwargs
+
+    def __option_type_context(self, context: "_Context", type: int) -> dict:
+        """
+        Looks up the type of option respective to the existing
+        option types.
+
+        :param _Context context: The context to refer types from.
+        :param int type: The option type.
+        :return: The option type context.
+        :rtype: dict
+        """
+        _resolved = {}
+        if type == OptionType.USER.value:
+            _resolved = (
+                context.data.resolved.members if context.guild_id else context.data.resolved.users
+            )
+            if context.guild_id:
+                with suppress(AttributeError):  # edge-case
+                    for key in _resolved.keys():
+                        _resolved[key]._extras["guild_id"] = context.guild_id
+        elif type == OptionType.CHANNEL.value:
+            _resolved = context.data.resolved.channels
+        elif type == OptionType.ROLE.value:
+            _resolved = context.data.resolved.roles
+        elif type == OptionType.ATTACHMENT.value:
+            _resolved = context.data.resolved.attachments
+        elif type == OptionType.MENTIONABLE.value:
+            _roles = context.data.resolved.roles if context.data.resolved.roles is not None else {}
+            _members = (
+                context.data.resolved.members if context.guild_id else context.data.resolved.users
+            )
+            if context.guild_id:
+                with suppress(AttributeError):  # edge-case
+                    for member in _members.values():
+                        member._extras["guild_id"] = context.guild_id
+
+            _resolved = _members | _roles
+
+        return _resolved
+
+    def __select_option_type_context(self, context: "_Context", type: int) -> dict:
+        """
+        Looks up the type of select menu respective to the existing option types. This is applicable for non-string
+        select menus.
+
+        :param context: The context to refer types from.
+        :type context: object
+        :param type: The option type.
+        :type type: int
+        :return: The select menu type context.
+        :rtype: dict
+        """
+
+        _resolved = {}
+
+        if type == ComponentType.USER_SELECT.value:
+            _resolved = (
+                context.data.resolved.members if context.guild_id else context.data.resolved.users
+            )
+            if context.guild_id:
+                with suppress(AttributeError):  # edge-case
+                    for key in _resolved.keys():
+                        _resolved[key]._extras["guild_id"] = context.guild_id
+        elif type == ComponentType.CHANNEL_SELECT.value:
+            _resolved = context.data.resolved.channels
+        elif type == ComponentType.ROLE_SELECT.value:
+            _resolved = context.data.resolved.roles
+        elif type == ComponentType.MENTIONABLE_SELECT.value:
+            members = (
+                context.data.resolved.members if context.guild_id else context.data.resolved.users
+            )
+            roles = context.data.resolved.roles
+
+            if context.guild_id:
+                with suppress(AttributeError):  # edge-case
+                    for member in members.values():
+                        member._extras["guild_id"] = context.guild_id
+
+            _resolved = members | roles
+
+        return _resolved
 
     async def modify_nick_in_guild(
         self, guild_id: Union[int, str, Snowflake, Guild], new_nick: Optional[str] = MISSING
