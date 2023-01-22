@@ -4,7 +4,7 @@ from logging import Logger
 from typing import TYPE_CHECKING, List, Optional, Tuple, Union
 
 from ..api.error import LibraryException
-from ..api.models.channel import Channel, Thread
+from ..api.models.channel import Channel
 from ..api.models.flags import MessageFlags, Permissions
 from ..api.models.guild import Guild
 from ..api.models.member import Member

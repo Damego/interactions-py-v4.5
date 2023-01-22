@@ -25,6 +25,7 @@ from aiohttp import ClientWebSocketResponse, WSMessage, WSMsgType
 
 from ...base import __version__, get_logger
 from ...client.enums import IntEnum
+from ...client.models import Option  # noqa
 from ...utils.missing import MISSING
 from ..dispatch import Listener
 from ..error import LibraryException
